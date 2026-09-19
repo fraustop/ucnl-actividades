@@ -3,6 +3,8 @@ import {
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut, 
   sendPasswordResetEmail,
   updateProfile
@@ -37,8 +39,14 @@ export const getFriendlyAuthErrorMessage = (errorCode) => {
       return 'Error de red. Comprueba tu conexión a Internet.';
     case 'auth/too-many-requests':
       return 'Demasiados intentos fallidos. Intenta más tarde.';
+    case 'auth/popup-closed-by-user':
+      return 'Se cerró la ventana de inicio de sesión con Google antes de completar el acceso.';
+    case 'auth/cancelled-popup-request':
+      return 'Se canceló la solicitud de inicio de sesión.';
+    case 'auth/popup-blocked':
+      return 'El navegador bloqueó la ventana emergente de Google. Permite las ventanas emergentes e intenta de nuevo.';
     default:
-      return 'Ocurrió un error al autenticar. Verifica tu correo y contraseña.';
+      return 'Ocurrió un error al autenticar. Verifica tus credenciales o intenta de nuevo.';
   }
 };
 
@@ -53,7 +61,7 @@ export const AuthProvider = ({ children }) => {
       
       if (user) {
         try {
-          const profile = await ensureAdminProfile(user);
+          const profile = await ensureAdminProfile(user, 'estudiante');
           setUserProfile(profile);
         } catch (err) {
           console.warn('No se pudo cargar el perfil de Firestore:', err);
@@ -62,7 +70,7 @@ export const AuthProvider = ({ children }) => {
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
-            role: isSuper ? 'admin' : 'docente'
+            role: isSuper ? 'admin' : 'estudiante'
           });
         }
       } else {
@@ -77,6 +85,18 @@ export const AuthProvider = ({ children }) => {
 
   const loginWithEmail = async (email, password) => {
     return signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const loginWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, provider);
+    if (result?.user) {
+      // Si el usuario no tiene cuenta previa, se le crea con rol 'estudiante' por defecto
+      const profile = await ensureAdminProfile(result.user, 'estudiante');
+      setUserProfile(profile);
+    }
+    return result;
   };
 
   const registerWithEmail = async (email, password, displayName, role = 'estudiante') => {
@@ -112,6 +132,7 @@ export const AuthProvider = ({ children }) => {
     isStudent,
     loading,
     loginWithEmail,
+    loginWithGoogle,
     registerWithEmail,
     logout,
     resetPassword

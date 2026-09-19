@@ -54,8 +54,10 @@ export const ensureAdminProfile = async (user, requestedRole = 'estudiante') => 
         uid: user.uid,
         email: user.email,
         displayName: user.displayName || (isSuperAdmin ? 'Administrador Principal' : 'Estudiante'),
-        role: isSuperAdmin ? 'admin' : requestedRole,
+        photoURL: user.photoURL || null,
+        role: isSuperAdmin ? 'admin' : (requestedRole || 'estudiante'),
         status: 'active',
+        authProvider: user.providerData?.[0]?.providerId || 'password',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
