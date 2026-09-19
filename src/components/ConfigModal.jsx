@@ -863,6 +863,11 @@ export const ConfigModal = ({
                     <span className="text-slate-300">Docentes / Tutores: </span>
                     <strong className="text-white">{usersList.filter(u => u.role === 'docente' || (!u.role && u.role !== 'admin')).length}</strong>
                   </div>
+                  <div className="px-3 py-1.5 bg-emerald-500/30 rounded-xl backdrop-blur-xs border border-emerald-400/40 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                    <span className="text-emerald-200">Notificación Confirmada: </span>
+                    <strong className="text-white">{usersList.filter(u => u.notificationConfirmed).length}</strong>
+                  </div>
                   <div className="px-3 py-1.5 bg-indigo-500/30 rounded-xl backdrop-blur-xs border border-indigo-400/30">
                     <span className="text-indigo-200">Admins: </span>
                     <strong className="text-white">{usersList.filter(u => u.role === 'admin').length}</strong>
@@ -1043,8 +1048,17 @@ export const ConfigModal = ({
                                       {user.displayName ? user.displayName[0] : (user.email ? user.email[0] : 'U')}
                                     </div>
                                     <div>
-                                      <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                                      <p className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
                                         <span>{user.displayName || 'Sin nombre'}</span>
+                                        {user.notificationConfirmed && (
+                                          <span 
+                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs"
+                                            title={`Notificación confirmada: ${user.notificationConfirmedAt ? new Date(user.notificationConfirmedAt).toLocaleString('es-MX') : 'Confirmado'}`}
+                                          >
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 inline" />
+                                            <span>Confirmado</span>
+                                          </span>
+                                        )}
                                         {isSuper && (
                                           <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">
                                             Super Admin

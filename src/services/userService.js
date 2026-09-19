@@ -399,3 +399,22 @@ export const markAdminNotificationAsRead = async (notifId) => {
   }
 };
 
+/**
+ * Registra que un usuario/estudiante confirmó haber recibido la notificación de verificación
+ */
+export const confirmUserNotificationReceipt = async (uid) => {
+  if (!uid) return { success: false, error: 'No uid provided' };
+  try {
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, {
+      notificationConfirmed: true,
+      notificationConfirmedAt: new Date().toISOString()
+    }, { merge: true });
+    return { success: true };
+  } catch (err) {
+    console.error('Error al confirmar recepción de notificación:', err);
+    return { success: false, error: err.message };
+  }
+};
+
+

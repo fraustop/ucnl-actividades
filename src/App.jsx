@@ -25,8 +25,10 @@ import {
 } from './services/syncService';
 import { 
   subscribeToStudentCompletions, 
-  saveStudentCompletion 
+  saveStudentCompletion,
+  confirmUserNotificationReceipt 
 } from './services/userService';
+import confetti from 'canvas-confetti';
 import { 
   onForegroundMessage,
   checkAndTriggerLocalDueReminders,
@@ -213,6 +215,25 @@ export function App() {
     });
 
     return () => unsubscribe();
+  }, [currentUser]);
+
+  // 6. Manejar confirmación de notificación si el usuario abrió desde la notificación push o enlace
+  useEffect(() => {
+    if (!currentUser) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'confirm_notification' || urlParams.get('confirm') === 'true') {
+      confirmUserNotificationReceipt(currentUser.uid).then(() => {
+        emitLocalNotification('🎉 ¡Notificación Confirmada!', {
+          body: 'Se ha registrado tu confirmación exitosamente. Tus profesores y administradores pueden ver que estás al día.',
+          tag: 'confirm_success'
+        });
+        try {
+          confetti({ particleCount: 80, spread: 70, origin: { y: 0.25 } });
+        } catch (_) {}
+      });
+      // Limpiar URL sin recargar
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, [currentUser]);
 
 
