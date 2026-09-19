@@ -267,9 +267,9 @@ export default function OnboardingScreen({ onDone }) {
     return (
       <Screen>
         <Logo />
-        <h2 className="text-xl font-bold text-white mb-2">Activa las Notificaciones</h2>
-        <p className="text-slate-400 text-sm mb-6 text-center max-w-xs">
-          Recibe alertas de entregas aunque la app esté cerrada.
+        <h2 className="text-xl font-bold text-white mb-2">¡Activa las Notificaciones!</h2>
+        <p className="text-slate-300 text-sm mb-6 text-center max-w-xs leading-relaxed">
+          Recibe las últimas novedades y recordatorios de entregas en tiempo real. <strong className="text-blue-300 font-semibold block mt-1">¡De lo contrario te estás perdiendo la mejor parte de la aplicación!</strong>
         </p>
 
         {notifyDone || alreadyGranted ? (

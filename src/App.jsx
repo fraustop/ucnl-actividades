@@ -50,6 +50,7 @@ import ListView from './components/ListView';
 import CalendarView from './components/CalendarView';
 import FirebaseStatusBanner from './components/FirebaseStatusBanner';
 import InAppNotificationBanner from './components/InAppNotificationBanner';
+import NotificationActivationReminder from './components/NotificationActivationReminder';
 import OnboardingScreen from './components/OnboardingScreen';
 import NotificationDrawer from './components/NotificationDrawer';
 
@@ -387,6 +388,9 @@ export function App() {
         onOpenResourcesModal={() => setResourcesModalOpen(true)}
         onOpenNotificationDrawer={() => setNotificationDrawerOpen(true)}
       />
+
+      {/* Recordatorio destacado de activación de notificaciones */}
+      <NotificationActivationReminder />
 
       {/* Banner de Filtros con Fondo Cromado en 1 Sola Fila Pegado al Encabezado */}
       <ActivityFilters
