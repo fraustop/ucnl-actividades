@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Fondo Cuadrado con bordes suaves -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Acento decorativo sutil -->
+  <circle cx="256" cy="256" r="180" fill="white" fill-opacity="0.04" />
+  <circle cx="256" cy="256" r="130" fill="white" fill-opacity="0.03" />
+
+  <!-- Birrete Académico / Graduation Cap con Sombra -->
+  <g filter="url(#shadow)">
+    <!-- Rombo / Tapa Superior del Birrete -->
+    <path d="M 256 120 L 430 195 L 256 270 L 82 195 Z" fill="#ffffff" />
+    
+    <!-- Base inferior del Birrete -->
+    <path d="M 148 226 L 148 300 C 148 340 364 340 364 300 L 364 226 L 256 272 Z" fill="#e2e8f0" />
+    
+    <!-- Botón Central -->
+    <circle cx="256" cy="195" r="10" fill="url(#goldGrad)" />
+    
+    <!-- Borla Dorada (Tassel) -->
+    <path d="M 256 195 Q 380 200 395 270" fill="none" stroke="url(#goldGrad)" stroke-width="8" stroke-linecap="round" />
+    <polygon points="386,268 404,268 408,325 382,325" fill="url(#goldGrad)" />
+    <circle cx="395" cy="270" r="7" fill="#b45309" />
+  </g>
+
+  <!-- Texto Institucional UCNL -->
+  <text x="256" y="420" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="60" fill="#ffffff" text-anchor="middle" letter-spacing="4">
+    UCNL
+  </text>
+  <text x="256" y="455" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="700" font-size="22" fill="#93c5fd" text-anchor="middle" letter-spacing="3">
+    ACTIVIDADES
+  </text>
+</svg>
