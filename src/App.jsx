@@ -526,6 +526,18 @@ export function App() {
           />
         )}
 
+        {/* Modal / Panel de Configuración: Ocupa todo el espacio disponible debajo del ribbon */}
+        {configModalOpen && (
+          <ConfigModal
+            isOpen={configModalOpen}
+            onClose={() => setConfigModalOpen(false)}
+            academicStructure={academicStructure}
+            onSaveStructure={handleSaveAcademicStructure}
+            isAdmin={isAdmin}
+            currentUser={currentUser}
+          />
+        )}
+
       </div>
 
       {/* Modal Crear / Editar Actividad */}
@@ -539,18 +551,6 @@ export function App() {
           onSave={handleSaveActivity}
           activityToEdit={activityToEdit}
           academicStructure={academicStructure}
-        />
-      )}
-
-      {/* Modal de Configuración (Tetramestres, Materias, Usuarios, Notificaciones) */}
-      {configModalOpen && (
-        <ConfigModal
-          isOpen={configModalOpen}
-          onClose={() => setConfigModalOpen(false)}
-          academicStructure={academicStructure}
-          onSaveStructure={handleSaveAcademicStructure}
-          isAdmin={isAdmin}
-          currentUser={currentUser}
         />
       )}
 

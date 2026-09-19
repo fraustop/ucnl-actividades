@@ -478,21 +478,31 @@ export const ConfigModal = ({
     );
   });
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="absolute inset-0 z-40 bg-slate-100/95 flex flex-col overflow-hidden animate-in fade-in duration-150">
       <div 
-        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 w-full max-w-4xl max-h-[94vh] sm:max-h-[92vh] flex flex-col overflow-hidden relative"
+        className="bg-white flex-1 flex flex-col overflow-hidden w-full h-full border-t border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera */}
-        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5 sm:space-x-3">
+        <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-slate-200 bg-white flex items-center justify-between flex-shrink-0 shadow-xs">
+          <div className="flex items-center space-x-2.5 sm:space-x-3.5">
             <div className="p-2 sm:p-2.5 bg-gradient-to-tr from-blue-700 to-indigo-600 text-white rounded-2xl shadow-sm shadow-blue-500/20 flex-shrink-0">
-              <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Settings className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-xl font-bold text-slate-900 flex items-center gap-1.5 sm:gap-2">
-                <span className="truncate">Configuración</span>
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                <span>Panel de Configuración</span>
                 {isAdmin && (
                   <span className="text-[10px] sm:text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200 flex-shrink-0">
                     Admin
@@ -500,20 +510,22 @@ export const ConfigModal = ({
                 )}
               </h2>
               <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1">
-                Estructura académica de Tetras, Materias y Docentes.
+                Estructura académica de Tetras, Materias, Gestión de Usuarios y Notificaciones.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition shadow-xs"
+            title="Cerrar panel (Esc)"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
+            <span className="hidden sm:inline">Cerrar</span>
           </button>
         </div>
 
         {/* Pestañas con scroll suave en móvil */}
-        <div className="flex border-b border-slate-200 bg-slate-100/60 px-4 sm:px-6 pt-2.5 gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll">
+        <div className="flex border-b border-slate-200 bg-slate-50 px-4 sm:px-6 lg:px-8 pt-2.5 gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll flex-shrink-0">
           <button
             onClick={() => setActiveTab('tetras')}
             className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
@@ -577,7 +589,7 @@ export const ConfigModal = ({
         </div>
 
         {/* Contenido de Pestañas */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5 text-sm touch-scroll">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 text-sm touch-scroll max-w-7xl w-full mx-auto">
           {error && (
             <div className="flex items-center space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -1578,64 +1590,66 @@ export const ConfigModal = ({
         </div>
 
         {/* Pie del modal con botón Guardar */}
-        <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-          <span className="text-xs text-slate-500">
-            {savedSuccess ? (
-              <span className="text-emerald-600 font-bold flex items-center space-x-1">
-                <Check className="w-4 h-4" />
-                <span>¡Estructura guardada y sincronizada!</span>
-              </span>
-            ) : activeTab === 'notifications' ? (
-              'Los ajustes de horarios y alertas se guardarán en Firebase.'
-            ) : (
-              'Los cambios en Tetras y Materias se sincronizarán en Firestore e IndexedDB.'
-            )}
-          </span>
+        <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+          <div className="max-w-7xl w-full mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <span className="text-xs text-slate-500 text-center sm:text-left">
+              {savedSuccess ? (
+                <span className="text-emerald-600 font-bold flex items-center space-x-1">
+                  <Check className="w-4 h-4" />
+                  <span>¡Estructura guardada y sincronizada!</span>
+                </span>
+              ) : activeTab === 'notifications' ? (
+                'Los ajustes de horarios y alertas se guardarán en Firebase.'
+              ) : (
+                'Los cambios en Tetras y Materias se sincronizarán en Firestore e IndexedDB.'
+              )}
+            </span>
 
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition"
-            >
-              Cerrar
-            </button>
-            {activeTab === 'notifications' ? (
+            <div className="flex items-center space-x-2">
               <button
-                onClick={handleSaveNotificationConfig}
-                disabled={savingNotifications}
-                className="inline-flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md shadow-blue-500/25 transition disabled:opacity-50"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition"
               >
-                {savingNotifications ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Guardando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span>Guardar Notificaciones</span>
-                  </>
-                )}
+                Cerrar
               </button>
-            ) : activeTab !== 'users' ? (
-              <button
-                onClick={handleSaveAll}
-                disabled={isSaving}
-                className="inline-flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md shadow-blue-500/25 transition disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Guardando...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    <span>Guardar Estructura</span>
-                  </>
-                )}
-              </button>
-            ) : null}
+              {activeTab === 'notifications' ? (
+                <button
+                  onClick={handleSaveNotificationConfig}
+                  disabled={savingNotifications}
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md shadow-blue-500/25 transition disabled:opacity-50"
+                >
+                  {savingNotifications ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Guardar Notificaciones</span>
+                    </>
+                  )}
+                </button>
+              ) : activeTab !== 'users' ? (
+                <button
+                  onClick={handleSaveAll}
+                  disabled={isSaving}
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold rounded-2xl shadow-md shadow-blue-500/25 transition disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Guardar Estructura</span>
+                    </>
+                  )}
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
