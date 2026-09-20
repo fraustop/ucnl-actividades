@@ -515,7 +515,63 @@ export const SubjectResourcesModal = ({
                 className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
               />
             </div>
-          ) : (type === 'pdf' || type === 'office' || type === 'web') ? (
+          ) : (type === 'office' || type === 'archive') ? (
+            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-slate-950 overflow-y-auto">
+              {!isMoodle && useGoogleDocsFallback ? (
+                <iframe
+                  src={googleViewerUrl || embedUrl}
+                  title={title}
+                  className="w-full h-full border-0 bg-white"
+                />
+              ) : (
+                <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+                  <div className="w-16 h-16 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center mx-auto shadow-inner">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                      {activeResource.platform || 'Documento Office'}
+                    </span>
+                    <h3 className="text-base font-bold text-white leading-snug break-words">
+                      {fileName || title}
+                    </h3>
+                    {isMoodle && (
+                      <p className="text-xs text-blue-400 font-medium">
+                        Portal Institucional UCNL (licenciatura.ucnl.edu.mx)
+                      </p>
+                    )}
+                  </div>
+                  <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300 text-left">
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      {isMoodle
+                        ? 'Este archivo institucional requiere tu sesión activa de estudiante. Haz clic en el botón para descargarlo directamente a tu equipo.'
+                        : 'Puedes descargar este archivo para editarlo en Word o Microsoft Office.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <a
+                      href={originalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={fileName || true}
+                      className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Descargar {fileExt ? `.${fileExt.toUpperCase()}` : 'Archivo'}</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDefaultBrowser(originalUrl)}
+                      className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      <span>Navegador</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (type === 'pdf' || type === 'web') ? (
             <iframe
               src={useGoogleDocsFallback && googleViewerUrl ? googleViewerUrl : (embedUrl || originalUrl)}
               title={title}

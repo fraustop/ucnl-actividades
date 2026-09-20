@@ -802,7 +802,7 @@ export const ActivityWorkspaceModal = ({
       );
     }
 
-    const { type, embedUrl, originalUrl, title, googleViewerUrl } = activeResource;
+    const { type, embedUrl, originalUrl, title, googleViewerUrl, isMoodle, officeSubtype, fileName, fileExt } = activeResource;
 
     return (
       <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden relative">
@@ -820,30 +820,45 @@ export const ActivityWorkspaceModal = ({
                 <FileText className="w-3.5 h-3.5" />
               )}
             </span>
-            <span className="text-xs font-bold truncate text-slate-200" title={title}>
-              {title}
+            <span className="text-xs font-bold truncate text-slate-200" title={fileName || title}>
+              {fileName || title}
             </span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase font-mono font-bold hidden sm:inline-block">
-              {type}
+              {fileExt || type}
             </span>
           </div>
 
           <div className="flex items-center space-x-1.5 flex-shrink-0">
-            {/* ExplicaciÃƒÂ³n de seguridad */}
+            {/* Descarga directa */}
+            {(type === 'office' || type === 'archive' || type === 'pdf' || isMoodle || activeResource?.downloadUrl) && (
+              <a
+                href={originalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={fileName || true}
+                className="px-2.5 py-1 text-[11px] font-extrabold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                title="Descargar archivo a tu equipo"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Descargar</span>
+              </a>
+            )}
+
+            {/* Explicación de seguridad */}
             <button
               onClick={() => setShowSecurityExplanation(true)}
               className="px-2 py-1 text-[11px] font-bold rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center gap-1 cursor-pointer"
-              title="Explicar por quÃƒÂ© algunos sitios rechazan la conexiÃƒÂ³n en la app"
+              title="Explicar por qué algunos sitios rechazan la conexión en la app"
             >
               <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">Ã‚Â¿Por quÃƒÂ© no abre?</span>
+              <span className="hidden sm:inline">¿Por qué no abre?</span>
             </button>
 
             {/* Abrir en Navegador Predeterminado */}
             <button
               onClick={() => handleOpenDefaultBrowser(originalUrl)}
               className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
-              title="Abrir pÃƒÂ¡gina en el navegador predeterminado de tu equipo"
+              title="Abrir página en el navegador predeterminado de tu equipo"
             >
               <Compass className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Abrir en Navegador</span>
@@ -851,7 +866,7 @@ export const ActivityWorkspaceModal = ({
             </button>
 
             {/* Alternar con Google Docs Viewer */}
-            {(type === 'pdf' || type === 'office' || type === 'web') && (
+            {(type === 'pdf' || (!isMoodle && type === 'office') || type === 'web') && (
               <button
                 onClick={() => setUseGoogleDocsFallback(!useGoogleDocsFallback)}
                 className={`px-2 py-1 text-[10px] font-bold rounded-lg transition border cursor-pointer ${
@@ -947,7 +962,7 @@ export const ActivityWorkspaceModal = ({
               autoPlay
               className="max-w-full max-h-full rounded-2xl shadow-2xl bg-black border border-slate-800"
             >
-              Tu navegador no soporta la reproducciÃƒÂ³n directa de este formato de video.
+              Tu navegador no soporta la reproducción directa de este formato de video.
             </video>
           )}
 
@@ -992,13 +1007,134 @@ export const ActivityWorkspaceModal = ({
             </div>
           )}
 
-          {/* Documentos Office */}
-          {type === 'office' && (
-            <iframe
-              src={googleViewerUrl || embedUrl}
-              title={title}
-              className="w-full h-full rounded-2xl border border-slate-800 bg-white"
-            />
+          {/* Documentos Office y Archivos Institucionales / Moodle */}
+          {(type === 'office' || type === 'archive') && (
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 bg-slate-950/90 text-center overflow-y-auto">
+              {!isMoodle && useGoogleDocsFallback ? (
+                <iframe
+                  src={googleViewerUrl || embedUrl}
+                  title={title}
+                  className="w-full h-full rounded-2xl border border-slate-800 bg-white"
+                />
+              ) : (
+                <div className="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 animate-in fade-in duration-200">
+                  {/* Icono del tipo de documento */}
+                  <div className="relative mx-auto w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl">
+                    {officeSubtype === 'excel' ? (
+                      <div className="w-full h-full rounded-3xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <FileText className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-600 text-white shadow">XLSX</span>
+                      </div>
+                    ) : officeSubtype === 'powerpoint' ? (
+                      <div className="w-full h-full rounded-3xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                        <FileText className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-orange-600 text-white shadow">PPTX</span>
+                      </div>
+                    ) : type === 'archive' ? (
+                      <div className="w-full h-full rounded-3xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                        <FolderOpen className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-600 text-white shadow">ZIP</span>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full rounded-3xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                        <FileText className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-600 text-white shadow">DOCX</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Título y Detalles */}
+                  <div className="space-y-2">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                      {activeResource.platform || 'Documento Microsoft Office'}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-black text-white leading-snug break-words">
+                      {fileName || title}
+                    </h3>
+                    {title && fileName && title !== fileName && (
+                      <p className="text-xs text-slate-400 font-medium truncate" title={title}>
+                        {title}
+                      </p>
+                    )}
+                    {isMoodle ? (
+                      <p className="text-xs text-blue-400 font-semibold flex items-center justify-center gap-1">
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>Portal Institucional UCNL (licenciatura.ucnl.edu.mx)</span>
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-400 font-medium">
+                        Documento disponible para descargar y editar
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Mensaje explicativo amigable */}
+                  <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700 text-left space-y-1.5 text-xs text-slate-300">
+                    <p className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <Info className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                      {isMoodle ? 'Descarga con sesión de estudiante' : 'Visualización y edición del archivo'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {isMoodle
+                        ? 'Este archivo Word/Office está protegido dentro del campus virtual de la UCNL. Al presionar "Descargar Archivo", tu navegador utilizará tu sesión activa para guardarlo directamente en tu equipo.'
+                        : 'Puedes descargar este documento para abrirlo y editarlo en Microsoft Word, Office 365 o Google Docs.'}
+                    </p>
+                  </div>
+
+                  {/* Botones de acción principales */}
+                  <div className="flex flex-col sm:flex-row items-stretch justify-center gap-2.5">
+                    <a
+                      href={originalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={fileName || true}
+                      className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Descargar {fileExt ? `.${fileExt.toUpperCase()}` : 'Plantilla / Documento'}</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDefaultBrowser(originalUrl)}
+                      className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer active:scale-95"
+                    >
+                      <ExternalLink className="w-4 h-4 text-slate-400" />
+                      <span>Abrir en Navegador</span>
+                    </button>
+                  </div>
+
+                  {/* Acciones secundarias */}
+                  <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-center gap-3 text-[11px] text-slate-400">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPopout(originalUrl)}
+                      className="hover:text-white flex items-center gap-1 cursor-pointer transition"
+                    >
+                      <AppWindow className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Ventana Paralela</span>
+                    </button>
+                    {!isMoodle && (
+                      <button
+                        type="button"
+                        onClick={() => setUseGoogleDocsFallback(!useGoogleDocsFallback)}
+                        className="hover:text-white flex items-center gap-1 cursor-pointer transition text-blue-400"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Probar Visor en Línea</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleCopyLink(originalUrl)}
+                      className="hover:text-white flex items-center gap-1 cursor-pointer transition"
+                    >
+                      {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedLink ? 'Copiado' : 'Copiar enlace'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Enlace Web GenÃƒÂ©rico */}

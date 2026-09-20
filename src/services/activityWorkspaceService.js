@@ -35,6 +35,29 @@ export const getEmbedInfo = (url = '', title = '') => {
   const cleanUrl = url.trim();
   const lowerUrl = cleanUrl.toLowerCase();
 
+  // Extraer nombre de archivo si viene en la URL
+  let extractedFileName = '';
+  try {
+    const urlObj = new URL(cleanUrl);
+    const pathname = urlObj.pathname;
+    const lastSeg = pathname.split('/').filter(Boolean).pop();
+    if (lastSeg) {
+      extractedFileName = decodeURIComponent(lastSeg);
+    }
+  } catch (_) {
+    const match = cleanUrl.match(/\/([^\/?#]+\.[a-zA-Z0-9]+)(?:[?#]|$)/);
+    if (match) {
+      try {
+        extractedFileName = decodeURIComponent(match[1]);
+      } catch (_) {
+        extractedFileName = match[1];
+      }
+    }
+  }
+
+  // Detectar si proviene de la plataforma Moodle / institucional UCNL
+  const isMoodle = /(?:licenciatura\.)?ucnl\.edu\.mx|pluginfile\.php|\/mod_\w+\//i.test(cleanUrl);
+
   // 1. YouTube
   // Formatos: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID, youtube.com/shorts/ID
   const ytMatch = cleanUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
@@ -115,7 +138,7 @@ export const getEmbedInfo = (url = '', title = '') => {
       platform: 'Video Directo',
       originalUrl: cleanUrl,
       embedUrl: cleanUrl,
-      title: title || 'Reproductor de Video',
+      title: title || extractedFileName || 'Reproductor de Video',
       icon: 'video'
     };
   }
@@ -127,7 +150,7 @@ export const getEmbedInfo = (url = '', title = '') => {
       platform: 'Audio Directo',
       originalUrl: cleanUrl,
       embedUrl: cleanUrl,
-      title: title || 'Reproductor de Audio',
+      title: title || extractedFileName || 'Reproductor de Audio',
       icon: 'audio'
     };
   }
@@ -139,7 +162,7 @@ export const getEmbedInfo = (url = '', title = '') => {
       platform: 'Imagen',
       originalUrl: cleanUrl,
       embedUrl: cleanUrl,
-      title: title || 'Visualizador de Imagen',
+      title: title || extractedFileName || 'Visualizador de Imagen',
       icon: 'image'
     };
   }
@@ -150,33 +173,80 @@ export const getEmbedInfo = (url = '', title = '') => {
       type: 'pdf',
       platform: 'Documento PDF',
       originalUrl: cleanUrl,
+      downloadUrl: cleanUrl,
       embedUrl: cleanUrl,
       googleViewerUrl: `https://docs.google.com/viewer?url=${encodeURIComponent(cleanUrl)}&embedded=true`,
-      title: title || 'Visor de PDF',
+      title: title || extractedFileName || 'Visor de PDF',
+      fileName: extractedFileName || title || 'Documento.pdf',
+      fileExt: 'pdf',
+      isMoodle: isMoodle,
       icon: 'pdf'
     };
   }
 
   // 9. Documentos de Office (Word, Excel, PowerPoint)
-  if (/\.(docx?|xlsx?|pptx?|odt|ods|odp)($|\?)/i.test(lowerUrl)) {
+  if (/\.(docx?|dotx?|xlsx?|xlsm|xlsb|csv|pptx?|ppsx?|odt|ods|odp|rtf)($|\?)/i.test(lowerUrl)) {
+    let subtype = 'word';
+    let platform = 'Documento Microsoft Word';
+    let ext = 'docx';
+
+    if (/\.(xlsx?|xlsm|xlsb|csv|ods)($|\?)/i.test(lowerUrl)) {
+      subtype = 'excel';
+      platform = 'Hoja de Cálculo Excel';
+      ext = 'xlsx';
+    } else if (/\.(pptx?|ppsx?|odp)($|\?)/i.test(lowerUrl)) {
+      subtype = 'powerpoint';
+      platform = 'Presentación PowerPoint';
+      ext = 'pptx';
+    } else if (/\.(docx?|dotx?|odt|rtf)($|\?)/i.test(lowerUrl)) {
+      subtype = 'word';
+      platform = 'Documento Microsoft Word';
+      ext = 'docx';
+    }
+
     return {
       type: 'office',
-      platform: 'Documento Office',
+      platform: platform,
+      officeSubtype: subtype,
+      fileExt: ext,
+      fileName: extractedFileName || title || `Documento.${ext}`,
       originalUrl: cleanUrl,
+      downloadUrl: cleanUrl,
       embedUrl: `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(cleanUrl)}`,
       googleViewerUrl: `https://docs.google.com/viewer?url=${encodeURIComponent(cleanUrl)}&embedded=true`,
-      title: title || 'Visor de Documentos Office',
+      title: title || extractedFileName || platform,
+      isMoodle: isMoodle,
       icon: 'document'
     };
   }
 
-  // 10. Web general / Portal / Iframe genérico
+  // 10. Archivos comprimidos (ZIP, RAR, 7Z, TAR, GZ)
+  if (/\.(zip|rar|7z|tar|gz)($|\?)/i.test(lowerUrl)) {
+    return {
+      type: 'archive',
+      platform: 'Archivo Comprimido',
+      fileName: extractedFileName || title || 'Archivo.zip',
+      fileExt: 'zip',
+      originalUrl: cleanUrl,
+      downloadUrl: cleanUrl,
+      embedUrl: cleanUrl,
+      title: title || extractedFileName || 'Archivo Comprimido',
+      isMoodle: isMoodle,
+      icon: 'archive'
+    };
+  }
+
+  // 11. Web general / Portal / Iframe genérico
   return {
     type: 'web',
-    platform: 'Enlace Web',
+    platform: isMoodle ? 'Plataforma UCNL (Moodle)' : 'Enlace Web',
     originalUrl: cleanUrl,
+    downloadUrl: cleanUrl,
     embedUrl: cleanUrl,
-    title: title || cleanUrl,
+    googleViewerUrl: `https://docs.google.com/viewer?url=${encodeURIComponent(cleanUrl)}&embedded=true`,
+    title: title || extractedFileName || cleanUrl,
+    fileName: extractedFileName || '',
+    isMoodle: isMoodle,
     icon: 'globe'
   };
 };
