@@ -44,7 +44,8 @@ import {
   BookOpen,
   Edit2,
   Save,
-  Plus
+  Plus,
+  ChevronRight
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ACTIVITY_TYPES } from '../types/constants';
@@ -355,6 +356,24 @@ export const ActivityWorkspaceModal = ({
   // Objetos de Tetra y Materia actuales en modo 'subject'
   const currentTetra = academicStructure.find(t => t.id === selectedTetraId) || academicStructure[0] || null;
   const currentSubject = currentTetra?.subjects?.find(s => s.id === selectedSubjectId) || currentTetra?.subjects?.[0] || null;
+
+  // Actividades correspondientes a la materia seleccionada
+  const subjectActivities = (activities || []).filter(act => {
+    if (!currentSubject) return false;
+    if (act.subjectId && currentSubject.id && act.subjectId === currentSubject.id) return true;
+    if (act.subject && currentSubject.name && act.subject.trim().toLowerCase() === currentSubject.name.trim().toLowerCase()) {
+      if (act.tetraId && currentTetra?.id) return act.tetraId === currentTetra.id;
+      return true;
+    }
+    if (currentSubject.code && act.subjectCode && act.subjectCode.trim().toLowerCase() === currentSubject.code.trim().toLowerCase()) {
+      return true;
+    }
+    return false;
+  }).sort((a, b) => {
+    const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+    const db = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+    return da - db;
+  });
 
   // Cambiar tetra en modo subject
   const handleSubjectTetraChange = (tetraId) => {
@@ -1331,6 +1350,127 @@ export const ActivityWorkspaceModal = ({
                       ) : subjectData?.description ? (
                         <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-slate-800 leading-relaxed"><RichTextRenderer content={subjectData.description} onLinkClick={(url, label) => handleSelectResource({ url, title: label || url })} /></div>
                       ) : <div className="p-3 rounded-2xl bg-white border border-slate-200 text-slate-400 text-xs italic">{canManageSubject ? 'Sin programa. Clic en Editar para anadirlo.' : 'Sin programa oficial registrado.'}</div>}
+                    </div>
+
+                    {/* SECCIÓN: Actividades Registradas de esta Materia */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                          Actividades Registradas ({subjectActivities.length})
+                        </h3>
+                      </div>
+                      {subjectActivities.length === 0 ? (
+                        <div className="p-3 rounded-2xl bg-white border border-slate-200 text-slate-400 text-xs italic">
+                          No hay actividades escolares registradas para esta materia aún.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {subjectActivities.map((act) => {
+                            const actUserStatus = studentCompletions[act.id] || 'pending';
+                            const isActCompleted = actUserStatus === 'completed' || actUserStatus === true;
+                            const isActInProgress = actUserStatus === 'in_progress';
+                            const actTypeInfo = ACTIVITY_TYPES.find(t => t.id === act.type) || { 
+                              label: 'Actividad', 
+                              badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' 
+                            };
+                            const actDueInfo = getDueBadgeInfo(act.dueDate, isActCompleted);
+                            const actAttachments = act.attachments || [];
+                            const actLinks = act.links || [];
+
+                            return (
+                              <div key={act.id} className="p-3 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300 shadow-sm transition space-y-2.5">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="space-y-1 min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold border ${actTypeInfo.badgeClass}`}>
+                                        {actTypeInfo.label}
+                                      </span>
+                                      {actDueInfo && (
+                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold border ${actDueInfo.badgeClass}`}>
+                                          {actDueInfo.icon}
+                                          <span>{actDueInfo.label}</span>
+                                        </span>
+                                      )}
+                                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                                        isActCompleted 
+                                          ? 'bg-emerald-100 text-emerald-800' 
+                                          : isActInProgress 
+                                          ? 'bg-blue-100 text-blue-800' 
+                                          : 'bg-amber-100 text-amber-800'
+                                      }`}>
+                                        {isActCompleted ? 'Completada' : isActInProgress ? 'En Progreso' : 'Pendiente'}
+                                      </span>
+                                    </div>
+                                    <h4 className="font-extrabold text-xs text-slate-900 leading-snug">
+                                      {act.title}
+                                    </h4>
+                                    {act.dueDate && (
+                                      <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                        <Clock className="w-3 h-3 text-slate-400" />
+                                        <span>Entrega: {formatFullDate(act.dueDate)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setWorkspaceMode('activity');
+                                      setCurrentActivity(act);
+                                      if (onModeChange) onModeChange('activity');
+                                      if (onSelectActivity) onSelectActivity(act);
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white text-xs font-extrabold flex items-center gap-1 transition cursor-pointer flex-shrink-0 active:scale-95 shadow-sm"
+                                    title="Abrir espacio de trabajo de esta actividad"
+                                  >
+                                    <span>Abrir</span>
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                {/* Recursos rápidos de la actividad (Archivos y Enlaces) */}
+                                {(actAttachments.length > 0 || actLinks.length > 0) && (
+                                  <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                      <FolderOpen className="w-3 h-3 text-indigo-500" />
+                                      Recursos ({actAttachments.length + actLinks.length})
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {actAttachments.map((file, idx) => (
+                                        <button
+                                          key={file.id || idx}
+                                          type="button"
+                                          onClick={() => handleSelectResource({ url: file.downloadUrl, name: file.name, category: file.category })}
+                                          className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 hover:border-indigo-300 rounded-lg text-[11px] font-semibold text-slate-700 transition cursor-pointer max-w-full truncate active:scale-95"
+                                          title={`Ver en visor: ${file.name}`}
+                                        >
+                                          <FileIcon category={file.category} className="w-3.5 h-3.5 flex-shrink-0" />
+                                          <span className="truncate max-w-[140px]">{file.name}</span>
+                                          <Eye className="w-3 h-3 text-indigo-600 flex-shrink-0 ml-0.5" />
+                                        </button>
+                                      ))}
+                                      {actLinks.map((link, idx) => (
+                                        <button
+                                          key={link.id || idx}
+                                          type="button"
+                                          onClick={() => handleSelectResource(link)}
+                                          className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 hover:border-indigo-300 rounded-lg text-[11px] font-semibold text-slate-700 transition cursor-pointer max-w-full truncate active:scale-95"
+                                          title={`Ver en visor: ${link.title || link.url}`}
+                                        >
+                                          <ExternalLink className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                                          <span className="truncate max-w-[140px]">{link.title || link.url}</span>
+                                          <Eye className="w-3 h-3 text-indigo-600 flex-shrink-0 ml-0.5" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
