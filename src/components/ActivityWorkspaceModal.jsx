@@ -267,6 +267,7 @@ export const ActivityWorkspaceModal = ({
   const handleSubjectChange = (subjectId) => {
     setSelectedSubjectId(subjectId);
     setActiveResource(null);
+    setActiveTab('viewer');
   };
 
   // Guardar programa / descripción de la materia
@@ -932,10 +933,11 @@ export const ActivityWorkspaceModal = ({
             <button
               type="button"
               onClick={() => {
-                setWorkspaceMode('subject');
-                setActiveTab('viewer');
-                if (onModeChange) onModeChange('subject');
-              }}
+                  setWorkspaceMode('subject');
+                  setActiveTab('viewer');
+                  setActiveResource(null);
+                  if (onModeChange) onModeChange('subject');
+                }}
               className={`flex-1 flex items-center justify-center space-x-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                 workspaceMode === 'subject'
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
@@ -948,31 +950,26 @@ export const ActivityWorkspaceModal = ({
           </div>
         </div>
 
-        {/* --- CONTENIDO MODO MATERIA --- */}
+        {/* --- CONTENIDO MODO MATERIA: Filtro de Tetra + Lista de Materias --- */}
         {workspaceMode === 'subject' ? (
           <div className="flex-1 flex flex-col h-full overflow-hidden">
-            {/* Selectores de Tetra y Materia */}
+            {/* Cabecera del explorador de materias */}
             <div className="p-3.5 sm:p-4 border-b border-slate-200 bg-white space-y-2.5 flex-shrink-0 shadow-2xs">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0 font-bold">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
                     <BookOpen className="w-4 h-4" />
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-extrabold text-slate-900 truncate">
-                      {currentSubject?.name || 'Selecciona una Materia'}
+                  <div>
+                    <h2 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
+                      <span>Recursos por Materia</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        {(currentTetra?.subjects || []).length}
+                      </span>
                     </h2>
-                    <div className="flex items-center space-x-2 text-[10px] text-slate-500">
-                      {currentSubject?.code && (
-                        <span className="font-mono bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold">
-                          {currentSubject.code}
-                        </span>
-                      )}
-                      <span>{currentTetra?.name}</span>
-                    </div>
+                    <p className="text-[10px] text-slate-500">Selecciona una materia para ver sus recursos</p>
                   </div>
                 </div>
-
                 <button
                   onClick={onClose}
                   className="md:hidden p-1.5 text-slate-500 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition"
@@ -982,264 +979,64 @@ export const ActivityWorkspaceModal = ({
                 </button>
               </div>
 
-              {/* Selectores Dropdown */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tetramestre</label>
-                  <select
-                    value={selectedTetraId}
-                    onChange={(e) => handleSubjectTetraChange(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                  >
-                    {academicStructure.map((tetra) => (
-                      <option key={tetra.id} value={tetra.id}>
-                        {tetra.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Materia</label>
-                  <select
-                    value={selectedSubjectId}
-                    onChange={(e) => handleSubjectChange(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                  >
-                    {(currentTetra?.subjects || []).map((sub) => (
-                      <option key={sub.id} value={sub.id}>
-                        {sub.name} {sub.code ? `(${sub.code})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              {/* Filtro por Tetramestre */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Filtrar por Tetramestre</label>
+                <select
+                  value={selectedTetraId}
+                  onChange={(e) => handleSubjectTetraChange(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  {academicStructure.map((tetra) => (
+                    <option key={tetra.id} value={tetra.id}>
+                      {tetra.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Contenido Desplazable de la Materia */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 touch-scroll min-h-0 text-sm text-slate-700">
-              {loadingSubject ? (
-                <div className="p-8 text-center space-y-2 text-slate-400">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
-                  <p className="text-xs">Cargando recursos de la materia...</p>
+            {/* Lista de Materias como tarjetas clickeables */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 touch-scroll min-h-0">
+              {(currentTetra?.subjects || []).length === 0 ? (
+                <div className="p-8 text-center text-slate-400 space-y-2">
+                  <BookOpen className="w-8 h-8 mx-auto text-slate-300" />
+                  <p className="text-xs font-semibold">No hay materias registradas en este tetramestre.</p>
                 </div>
               ) : (
-                <>
-                  {/* Sección 1: Programa / Guía Oficial */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Programa / Guía Oficial</span>
-                      </h3>
-                      {canManageSubject && !isEditingSubjectDesc && (
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingSubjectDesc(true)}
-                          className="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition cursor-pointer"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                          <span>Editar</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {isEditingSubjectDesc ? (
-                      <div className="space-y-2 bg-white p-3 rounded-2xl border border-indigo-200 shadow-sm">
-                        <RichTextEditor
-                          value={subjectDescText}
-                          onChange={setSubjectDescText}
-                          placeholder="Escribe el programa de la materia, objetivos, criterios de evaluación..."
-                        />
-                        <div className="flex items-center justify-end space-x-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsEditingSubjectDesc(false);
-                              setSubjectDescText(subjectData?.description || '');
-                            }}
-                            className="px-3 py-1 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleSaveSubjectDescription}
-                            disabled={isSavingSubjectDesc}
-                            className="inline-flex items-center space-x-1 px-3.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer"
-                          >
-                            {isSavingSubjectDesc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                            <span>Guardar Programa</span>
-                          </button>
+                (currentTetra.subjects).map((sub) => {
+                  const isSelected = sub.id === selectedSubjectId;
+                  return (
+                    <div
+                      key={sub.id}
+                      onClick={() => handleSubjectChange(sub.id)}
+                      className={`p-3 rounded-2xl border transition cursor-pointer group space-y-1 ${
+                        isSelected
+                          ? 'bg-indigo-50 border-indigo-400 shadow-sm'
+                          : 'bg-white border-slate-200 hover:bg-indigo-50/50 hover:border-indigo-300 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {sub.code && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-indigo-900 text-white flex-shrink-0">
+                              {sub.code}
+                            </span>
+                          )}
+                          <span className={`text-xs font-extrabold truncate ${isSelected ? 'text-indigo-800' : 'text-slate-900 group-hover:text-indigo-700'} transition`}>
+                            {sub.name}
+                          </span>
                         </div>
+                        {isSelected && (
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
+                        )}
                       </div>
-                    ) : subjectData?.description ? (
-                      <div className="bg-white p-4 rounded-2xl border border-slate-200 text-slate-800 leading-relaxed shadow-xs">
-                        <RichTextRenderer 
-                          content={subjectData.description} 
-                          onLinkClick={(url, label) => handleSelectResource({ url, title: label || url })}
-                        />
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-2xl bg-white border border-slate-200 text-slate-400 text-xs italic">
-                        {canManageSubject 
-                          ? 'No se ha configurado el programa de esta materia. Haz clic en "Editar" arriba para añadirlo.' 
-                          : 'Esta materia aún no tiene un programa oficial registrado.'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Sección 2: Documentos y Archivos Adjuntos de la Materia */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Documentos y Libros ({subjectData?.attachments?.length || 0})</span>
-                      </h3>
-                      {canManageSubject && (
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('upload')}
-                          className="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Subir</span>
-                        </button>
-                      )}
+                      <p className="text-[10px] text-slate-500">
+                        {currentTetra.name}
+                      </p>
                     </div>
-
-                    {(!subjectData?.attachments || subjectData.attachments.length === 0) ? (
-                      <div className="p-4 rounded-2xl bg-white border border-slate-200 text-slate-400 text-xs italic">
-                        No hay documentos adjuntos en esta materia.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-2">
-                        {subjectData.attachments.map((file) => (
-                          <div
-                            key={file.id}
-                            className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-white hover:border-indigo-300 transition group"
-                          >
-                            <div className="flex items-center space-x-2.5 truncate pr-2">
-                              <FileIcon category={file.category} className="w-5 h-5 flex-shrink-0" />
-                              <div className="truncate">
-                                <p className="font-semibold text-slate-800 text-xs truncate" title={file.name}>
-                                  {file.name}
-                                </p>
-                                <div className="flex items-center space-x-1.5 text-[10px] text-slate-400">
-                                  <span>{formatBytes(file.size)}</span>
-                                  {file.uploadedBy && <span>• Por {file.uploadedBy}</span>}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center space-x-1 flex-shrink-0">
-                              <button
-                                onClick={() => handleSelectResource({ url: file.downloadUrl, name: file.name })}
-                                className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-600 hover:text-white rounded-lg transition flex items-center space-x-1 cursor-pointer"
-                                title="Ver en visor integrado"
-                              >
-                                <Eye className="w-3 h-3" />
-                                <span>Ver</span>
-                              </button>
-                              <a
-                                href={file.downloadUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download={file.name}
-                                className="p-1 text-slate-400 hover:text-blue-600 rounded-lg transition"
-                                title="Descargar"
-                              >
-                                <Download className="w-3.5 h-3.5" />
-                              </a>
-                              {canManageSubject && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteSubjectAttachment(file.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
-                                  title="Eliminar documento"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Sección 3: Enlaces Web y Videos de la Materia */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <ExternalLink className="w-3.5 h-3.5 text-indigo-600" />
-                        <span>Enlaces y Videos ({subjectData?.links?.length || 0})</span>
-                      </h3>
-                      {canManageSubject && (
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('share_link')}
-                          className="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Añadir</span>
-                        </button>
-                      )}
-                    </div>
-
-                    {(!subjectData?.links || subjectData.links.length === 0) ? (
-                      <div className="p-4 rounded-2xl bg-white border border-slate-200 text-slate-400 text-xs italic">
-                        No hay enlaces web registrados en esta materia.
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {subjectData.links.map((link) => (
-                          <div
-                            key={link.id}
-                            className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-indigo-50/50 border border-slate-200 hover:border-indigo-300 transition group"
-                          >
-                            <div className="flex items-center space-x-2 truncate pr-2">
-                              <ExternalLink className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
-                              <span className="font-semibold text-xs text-slate-800 truncate" title={link.title || link.url}>
-                                {link.title || link.url}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center space-x-1 flex-shrink-0">
-                              <button
-                                onClick={() => handleSelectResource(link)}
-                                className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-600 hover:text-white rounded-lg transition flex items-center space-x-1 cursor-pointer"
-                                title="Abrir en visor integrado"
-                              >
-                                <Eye className="w-3 h-3" />
-                                <span>Visor</span>
-                              </button>
-                              <a
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1 text-slate-400 hover:text-blue-600 rounded-lg transition"
-                                title="Abrir en pestaña nueva"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                              {canManageSubject && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteSubjectLink(link.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition cursor-pointer"
-                                  title="Eliminar enlace"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
+                  );
+                })
               )}
             </div>
           </div>
@@ -1715,67 +1512,129 @@ export const ActivityWorkspaceModal = ({
         {/* Barra de Pestañas Derecha */}
         <div className="px-3 sm:px-4 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
           <div className="flex items-center space-x-1 sm:space-x-1.5 flex-shrink-0">
-            <button
-              onClick={() => setActiveTab('viewer')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
-                activeTab === 'viewer'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                  : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
-              }`}
-            >
-              <Film className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Visor Integrado</span>
-              {activeResource && (
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              )}
-            </button>
 
-            {/* Pestaña Comentarios solo en modo actividad cuando hay una actividad seleccionada */}
-            {workspaceMode === 'activity' && currentActivity && (
-              <button
-                onClick={() => setActiveTab('comments')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'comments'
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                    : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
-                }`}
-              >
-                <MessagesSquare className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Comentarios & Dudas</span>
-                {comments.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-indigo-500 text-white">
-                    {comments.length}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Pestañas de Subir y Compartir (activas según permisos en materias o si hay actividad) */}
-            {(workspaceMode === 'activity' ? currentActivity : canManageSubject) && (
+            {/* Modo Materia: Tab de detalle + Visor (cuando hay recurso activo) */}
+            {workspaceMode === 'subject' ? (
               <>
                 <button
-                  onClick={() => setActiveTab('upload')}
+                  onClick={() => { setActiveTab('viewer'); setActiveResource(null); }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
-                    activeTab === 'upload'
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                    activeTab === 'viewer' && !activeResource
+                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
                       : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
                   }`}
                 >
-                  <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Subir Documentos</span>
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-300" />
+                  <span>{currentSubject?.name || 'Materia'}</span>
                 </button>
 
+                {activeResource && (
+                  <button
+                    onClick={() => setActiveTab('viewer')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                      activeTab === 'viewer' && activeResource
+                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                        : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                    }`}
+                  >
+                    <Film className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Visor</span>
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  </button>
+                )}
+
+                {canManageSubject && selectedSubjectId && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('upload')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                        activeTab === 'upload'
+                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                          : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Subir</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('share_link')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                        activeTab === 'share_link'
+                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                          : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      <Link2 className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Enlace</span>
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
+              /* Modo Actividad: Tabs originales */
+              <>
                 <button
-                  onClick={() => setActiveTab('share_link')}
+                  onClick={() => setActiveTab('viewer')}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
-                    activeTab === 'share_link'
+                    activeTab === 'viewer'
                       ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                       : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
                   }`}
                 >
-                  <Link2 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Compartir Enlace / Video</span>
+                  <Film className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Visor Integrado</span>
+                  {activeResource && (
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  )}
                 </button>
+
+                {currentActivity && (
+                  <button
+                    onClick={() => setActiveTab('comments')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                      activeTab === 'comments'
+                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                        : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                    }`}
+                  >
+                    <MessagesSquare className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Comentarios & Dudas</span>
+                    {comments.length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-indigo-500 text-white">
+                        {comments.length}
+                      </span>
+                    )}
+                  </button>
+                )}
+
+                {currentActivity && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('upload')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                        activeTab === 'upload'
+                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                          : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Subir Documentos</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('share_link')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 whitespace-nowrap cursor-pointer ${
+                        activeTab === 'share_link'
+                          ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                          : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      <Link2 className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Compartir Enlace / Video</span>
+                    </button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -1796,8 +1655,234 @@ export const ActivityWorkspaceModal = ({
         {/* Contenido Activo de la Columna Derecha */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-900">
           
-          {/* 1. VISOR INTEGRADO */}
-          {activeTab === 'viewer' && renderIntegratedViewer()}
+          {/* 1. DETALLE DE MATERIA (Solo modo subject) */}
+          {workspaceMode === 'subject' && activeTab === 'viewer' && !activeResource && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 touch-scroll min-h-0 text-sm text-slate-100">
+              {!selectedSubjectId ? (
+                <div className="h-full flex flex-col items-center justify-center p-6 text-center text-slate-400 space-y-4">
+                  <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                    <BookOpen className="w-8 h-8" />
+                  </div>
+                  <div className="max-w-sm space-y-1.5">
+                    <h4 className="text-base font-bold text-white">Selecciona una Materia</h4>
+                    <p className="text-xs text-slate-400 leading-relaxed">Haz clic en cualquier materia del panel izquierdo para ver su programa, documentos y recursos.</p>
+                  </div>
+                </div>
+              ) : loadingSubject ? (
+                <div className="h-full flex flex-col items-center justify-center space-y-3 text-slate-400">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+                  <p className="text-sm">Cargando recursos de {currentSubject?.name}...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Cabecera de la materia */}
+                  <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-700">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                        <BookOpen className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h2 className="text-sm font-extrabold text-white truncate">{currentSubject?.name}</h2>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                          {currentSubject?.code && (
+                            <span className="font-mono bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-bold border border-slate-700">
+                              {currentSubject.code}
+                            </span>
+                          )}
+                          <span>{currentTetra?.name}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sección: Programa / Guía Oficial */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Programa / Guía Oficial</span>
+                      </h3>
+                      {canManageSubject && !isEditingSubjectDesc && (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingSubjectDesc(true)}
+                          className="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg transition cursor-pointer border border-indigo-500/20"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          <span>Editar</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {isEditingSubjectDesc ? (
+                      <div className="space-y-2 bg-slate-800 p-3 rounded-2xl border border-indigo-500/30">
+                        <RichTextEditor
+                          value={subjectDescText}
+                          onChange={setSubjectDescText}
+                          placeholder="Escribe el programa de la materia, objetivos, criterios de evaluación..."
+                        />
+                        <div className="flex items-center justify-end space-x-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => { setIsEditingSubjectDesc(false); setSubjectDescText(subjectData?.description || ''); }}
+                            className="px-3 py-1 rounded-xl text-xs font-bold text-slate-300 hover:bg-slate-700 cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveSubjectDescription}
+                            disabled={isSavingSubjectDesc}
+                            className="inline-flex items-center space-x-1 px-3.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer"
+                          >
+                            {isSavingSubjectDesc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            <span>Guardar</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : subjectData?.description ? (
+                      <div className="bg-slate-800/60 p-4 rounded-2xl border border-slate-700 text-slate-200 leading-relaxed">
+                        <RichTextRenderer
+                          content={subjectData.description}
+                          onLinkClick={(url, label) => handleSelectResource({ url, title: label || url })}
+                        />
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700 text-slate-500 text-xs italic">
+                        {canManageSubject
+                          ? 'Sin programa configurado. Haz clic en "Editar" para añadirlo.'
+                          : 'Esta materia aún no tiene un programa oficial registrado.'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sección: Documentos y Libros */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <Paperclip className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Documentos y Libros ({subjectData?.attachments?.length || 0})</span>
+                      </h3>
+                      {canManageSubject && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('upload')}
+                          className="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg transition cursor-pointer border border-emerald-500/20"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Subir</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {(!subjectData?.attachments || subjectData.attachments.length === 0) ? (
+                      <div className="p-3 rounded-2xl bg-slate-800/40 border border-slate-700 text-slate-500 text-xs italic">
+                        No hay documentos adjuntos en esta materia.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {subjectData.attachments.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-2.5 rounded-xl border border-slate-700 bg-slate-800/60 hover:border-indigo-500/50 transition group">
+                            <div className="flex items-center space-x-2.5 truncate pr-2">
+                              <FileIcon category={file.category} className="w-5 h-5 flex-shrink-0" />
+                              <div className="truncate">
+                                <p className="font-semibold text-slate-200 text-xs truncate" title={file.name}>{file.name}</p>
+                                <div className="flex items-center space-x-1.5 text-[10px] text-slate-500">
+                                  <span>{formatBytes(file.size)}</span>
+                                  {file.uploadedBy && <span>• Por {file.uploadedBy}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-1 flex-shrink-0">
+                              <button
+                                onClick={() => handleSelectResource({ url: file.downloadUrl, name: file.name })}
+                                className="px-2.5 py-1 text-xs font-bold text-indigo-300 bg-indigo-500/10 hover:bg-indigo-600 hover:text-white rounded-lg transition flex items-center space-x-1 cursor-pointer"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>Ver</span>
+                              </button>
+                              <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer" download={file.name}
+                                className="p-1 text-slate-500 hover:text-blue-400 rounded-lg transition" title="Descargar">
+                                <Download className="w-3.5 h-3.5" />
+                              </a>
+                              {canManageSubject && (
+                                <button type="button" onClick={() => handleDeleteSubjectAttachment(file.id)}
+                                  className="p-1 text-slate-500 hover:text-rose-400 rounded-lg transition cursor-pointer">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sección: Enlaces y Videos */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <ExternalLink className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>Enlaces y Videos ({subjectData?.links?.length || 0})</span>
+                      </h3>
+                      {canManageSubject && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('share_link')}
+                          className="inline-flex items-center space-x-1 px-2 py-0.5 text-[11px] font-bold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition cursor-pointer border border-blue-500/20"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Añadir</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {(!subjectData?.links || subjectData.links.length === 0) ? (
+                      <div className="p-3 rounded-2xl bg-slate-800/40 border border-slate-700 text-slate-500 text-xs italic">
+                        No hay enlaces registrados en esta materia.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {subjectData.links.map((link) => (
+                          <div key={link.id} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500/50 transition group">
+                            <div className="flex items-center space-x-2 truncate pr-2">
+                              <ExternalLink className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
+                              <span className="font-semibold text-xs text-slate-200 truncate">{link.title || link.url}</span>
+                            </div>
+                            <div className="flex items-center space-x-1 flex-shrink-0">
+                              <button
+                                onClick={() => handleSelectResource(link)}
+                                className="px-2.5 py-1 text-xs font-bold text-indigo-300 bg-indigo-500/10 hover:bg-indigo-600 hover:text-white rounded-lg transition flex items-center space-x-1 cursor-pointer"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>Visor</span>
+                              </button>
+                              <a href={link.url} target="_blank" rel="noopener noreferrer"
+                                className="p-1 text-slate-500 hover:text-blue-400 rounded-lg transition">
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                              {canManageSubject && (
+                                <button type="button" onClick={() => handleDeleteSubjectLink(link.id)}
+                                  className="p-1 text-slate-500 hover:text-rose-400 rounded-lg transition cursor-pointer">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* 1b. VISOR INTEGRADO (cuando hay un recurso activo, en cualquier modo) */}
+          {activeTab === 'viewer' && activeResource && renderIntegratedViewer()}
+
+          {/* 1c. VISOR VACÍO (modo actividad sin recurso) */}
+          {activeTab === 'viewer' && !activeResource && workspaceMode === 'activity' && renderIntegratedViewer()}
 
           {/* 2. COMENTARIOS & DUDAS (Solo modo actividad) */}
           {activeTab === 'comments' && workspaceMode === 'activity' && currentActivity && (
