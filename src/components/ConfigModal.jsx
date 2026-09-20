@@ -1276,21 +1276,23 @@ export const ConfigModal = ({
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={handleTestNotification}
-                    disabled={testNotificationLoading}
-                    className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/15 hover:bg-white/25 text-white border border-white/20 transition disabled:opacity-50"
-                  >
-                    {testNotificationLoading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Send className="w-3.5 h-3.5" />
-                    )}
-                    <span>Probar en este equipo</span>
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={handleTestNotification}
+                      disabled={testNotificationLoading}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/15 hover:bg-white/25 text-white border border-white/20 transition disabled:opacity-50"
+                    >
+                      {testNotificationLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>Probar en este equipo</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Mensajes de Estado */}
@@ -1308,14 +1310,14 @@ export const ConfigModal = ({
                 </div>
               )}
 
-              {testNotificationResult === 'success' && (
+              {isAdmin && testNotificationResult === 'success' && (
                 <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-800 text-xs flex items-center space-x-2">
                   <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0" />
                   <span>¡Notificación de prueba enviada! Revisa el centro de notificaciones de tu sistema.</span>
                 </div>
               )}
 
-              {testNotificationResult.startsWith('error') && (
+              {isAdmin && testNotificationResult.startsWith('error') && (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center space-x-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
                   <span>{testNotificationResult}</span>
@@ -1522,33 +1524,35 @@ export const ConfigModal = ({
                     />
                   </label>
 
-                  {/* Regla Extra: Registro de Nuevos Usuarios (Solo Administradores) */}
-                  <label className={`flex items-start justify-between p-4 rounded-2xl border transition cursor-pointer ${
-                    notificationConfig.notifyNewUserToAdmins 
-                      ? 'bg-indigo-50/50 border-indigo-300' 
-                      : 'bg-white border-slate-200 opacity-60'
-                  }`}>
-                    <div className="flex items-start space-x-3 pr-3">
-                      <div className="w-4 h-4 mt-0.5 rounded-full bg-indigo-600 flex-shrink-0 shadow-xs" />
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <p className="font-bold text-slate-800 text-sm">Notificar Nuevos Usuarios a Administradores</p>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                            Para Admins
-                          </span>
+                  {/* Regla Extra: Registro de Nuevos Usuarios (Exclusiva para Administradores) */}
+                  {isAdmin && (
+                    <label className={`flex items-start justify-between p-4 rounded-2xl border transition cursor-pointer ${
+                      notificationConfig.notifyNewUserToAdmins 
+                        ? 'bg-indigo-50/50 border-indigo-300' 
+                        : 'bg-white border-slate-200 opacity-60'
+                    }`}>
+                      <div className="flex items-start space-x-3 pr-3">
+                        <div className="w-4 h-4 mt-0.5 rounded-full bg-indigo-600 flex-shrink-0 shadow-xs" />
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-bold text-slate-800 text-sm">Notificar Nuevos Usuarios a Administradores</p>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                              Exclusivo Admins
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1">
+                            Envía una notificación push instantánea a todos los usuarios con rol de <strong>Administrador</strong> en cuanto un nuevo usuario se registre en la aplicación.
+                          </p>
                         </div>
-                        <p className="text-xs text-slate-600 mt-1">
-                          Envía una notificación push instantánea a todos los usuarios con rol de <strong>Administrador</strong> en cuanto un nuevo usuario se registre en la aplicación.
-                        </p>
                       </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={notificationConfig.notifyNewUserToAdmins !== false}
-                      onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyNewUserToAdmins: e.target.checked })}
-                      className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 mt-1 cursor-pointer flex-shrink-0"
-                    />
-                  </label>
+                      <input
+                        type="checkbox"
+                        checked={notificationConfig.notifyNewUserToAdmins !== false}
+                        onChange={(e) => setNotificationConfig({ ...notificationConfig, notifyNewUserToAdmins: e.target.checked })}
+                        className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 mt-1 cursor-pointer flex-shrink-0"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
 
