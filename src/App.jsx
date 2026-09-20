@@ -150,20 +150,13 @@ export function App() {
     return () => unsubscribe();
   }, [currentUser]);
 
-  // 3. Comprobar recordatorios locales de vencimiento (al abrir y periódicamente)
+  // 3. Comprobar recordatorios locales de vencimiento (al abrir la app, 1 sola vez al día por dispositivo)
   useEffect(() => {
     if (!currentUser || activities.length === 0) return;
 
-    // Comprobación inicial al cargar actividades
-    checkAndTriggerLocalDueReminders(activities, studentCompletions, true);
-
-    // Comprobación periódica cada 4 horas mientras la pestaña permanezca abierta
-    const intervalId = setInterval(() => {
-      checkAndTriggerLocalDueReminders(activities, studentCompletions, true);
-    }, 4 * 60 * 60 * 1000);
-
-    return () => clearInterval(intervalId);
-  }, [currentUser, activities, studentCompletions]);
+    // Comprobación al cargar actividades (controlado por localStorage para no repetir en el mismo día)
+    checkAndTriggerLocalDueReminders(activities, studentCompletions, isStudent, false);
+  }, [currentUser, activities, studentCompletions, isStudent]);
 
   // 4. Escuchar notificaciones en primer plano
   useEffect(() => {

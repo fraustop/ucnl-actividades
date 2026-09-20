@@ -41,7 +41,7 @@ let currentConfig = {
 };
 
 let daily7DaysCronJob = null;
-let periodicCronJob = null;
+let lastDailyReminderDate = null;
 
 // ─── Utilidades de Red ────────────────────────────────────────────────────────
 function getLocalNetworkIp() {
@@ -346,21 +346,22 @@ function updateCronSchedules(newConfig = {}) {
   const cronExpr = `${minute} ${hour} * * *`;
 
   if (isEnabled) {
-    console.log(`⏰ [CRON] Programado recordatorio diario de 7 días: "${hourStr}" (${cronExpr}) [America/Monterrey / Sistema]`);
+    console.log(`⏰ [CRON] Programado recordatorio diario: "${hourStr}" (${cronExpr}) [America/Monterrey]`);
     daily7DaysCronJob = cron.schedule(cronExpr, async () => {
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Monterrey' }); // YYYY-MM-DD
+      if (lastDailyReminderDate === todayStr) {
+        console.log(`⏰ [CRON ${hourStr}] Recordatorio diario ya ejecutado hoy (${todayStr}). Omitiendo envío repetido.`);
+        return;
+      }
+      lastDailyReminderDate = todayStr;
       console.log(`⏰ [CRON ${hourStr}] Disparando recordatorio diario de actividades pendientes...`);
       await evaluateDaily7DaysReminders();
+    }, {
+      scheduled: true,
+      timezone: 'America/Monterrey'
     });
   } else {
     console.log('⏰ [CRON] Recordatorio diario de 7 días está DESACTIVADO en la configuración.');
-  }
-
-  // Programar chequeo periódico cada 2 horas si no existe
-  if (!periodicCronJob) {
-    periodicCronJob = cron.schedule('0 */2 * * *', async () => {
-      console.log('⏰ [CRON Periódico] Revisión de actividades cada 2h...');
-      await evaluateDueActivities();
-    });
   }
 }
 

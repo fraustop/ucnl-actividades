@@ -394,9 +394,9 @@ async function runNotificationWorker() {
     );
   }
 
-  // 5. Enviar Alertas de Hitos Específicos (7 días, 4 días, Urgentes)
-  if (milestoneAlerts.length > 0) {
-    console.log('\n--- Enviando alertas de hitos de vencimiento ---');
+  // 5. Enviar Alertas de Hitos Específicos solo si el recordatorio diario consolidado no está habilitado
+  if (config.daily7DaysReminderEnabled === false && milestoneAlerts.length > 0) {
+    console.log('\n--- Enviando alertas de hitos de vencimiento (modo individual) ---');
     const allTokens = users.flatMap(u => u.tokens);
 
     for (const alert of milestoneAlerts) {

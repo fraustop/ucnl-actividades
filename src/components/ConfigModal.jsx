@@ -1276,7 +1276,7 @@ export const ConfigModal = ({
                   <div className="p-3 bg-black/30 rounded-xl border border-white/10 space-y-1">
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">⏰ Programación Automática</span>
                     <span className="text-amber-300 font-bold">
-                      08:00 AM y c/2 hrs
+                      {notificationConfig.notificationHour || '08:00'} AM (1 vez al día)
                     </span>
                   </div>
                 </div>
