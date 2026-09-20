@@ -57,6 +57,8 @@ import ConfigModal from './components/ConfigModal';
 import KanbanView from './components/KanbanView';
 import ListView from './components/ListView';
 import CalendarView from './components/CalendarView';
+import FirebaseStatusBanner from './components/FirebaseStatusBanner';
+import InAppNotificationBanner from './components/InAppNotificationBanner';
 import NotificationActivationReminder from './components/NotificationActivationReminder';
 import OnboardingScreen from './components/OnboardingScreen';
 import NotificationDrawer from './components/NotificationDrawer';
