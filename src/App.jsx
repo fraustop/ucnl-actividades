@@ -315,50 +315,46 @@ export function App() {
     return () => unsubscribe();
   }, [currentUser, isAdmin]);
 
-  // Sincronizar actividad seleccionada (para detalles o workspace) cuando cargan las actividades
+  // Sincronizar actividad seleccionada (para detalles o workspace) cuando cargan las actividades iniciales
   useEffect(() => {
     if (activities && activities.length > 0) {
-      const targetActId = workspaceActivityId || selectedActivityId || initialNav.activityId;
-      if (targetActId) {
-        const found = activities.find(a => a.id === targetActId);
+      if (workspaceActivityId) {
+        const found = activities.find(a => a.id === workspaceActivityId);
         if (found) {
-          if (!selectedActivity) setSelectedActivity(found);
-          if (!workspaceActivity) setWorkspaceActivity(found);
+          setWorkspaceActivity(found);
         }
-      } else if (!workspaceActivity && activities.length > 0) {
-        setWorkspaceActivity(activities[0]);
-        setWorkspaceActivityId(activities[0].id);
+      }
+      if (selectedActivityId) {
+        const found = activities.find(a => a.id === selectedActivityId);
+        if (found) {
+          setSelectedActivity(found);
+        }
       }
     }
   }, [activities, workspaceActivityId, selectedActivityId]);
 
-  // Sincronizar tetra y materia seleccionada del workspace cuando carga la estructura académica
+  // Sincronizar tetra del workspace cuando carga la estructura académica
   useEffect(() => {
     if (academicStructure && academicStructure.length > 0) {
-      let targetTetra = academicStructure.find(t => t.id === workspaceTetraId);
-      if (!targetTetra) {
-        targetTetra = academicStructure[0];
-        setWorkspaceTetraId(targetTetra?.id || null);
-      }
-      if (targetTetra?.subjects?.length > 0) {
-        const targetSub = targetTetra.subjects.find(s => s.id === workspaceSubjectId);
-        if (!targetSub) {
-          setWorkspaceSubjectId(targetTetra.subjects[0]?.id || null);
-        }
+      if (!workspaceTetraId) {
+        setWorkspaceTetraId(academicStructure[0]?.id || null);
       }
     }
-  }, [academicStructure, workspaceTetraId, workspaceSubjectId]);
+  }, [academicStructure, workspaceTetraId]);
 
   // Función unificada para persistir y sincronizar el estado de navegación
   const syncNav = (override = {}, pushHistory = true) => {
     const actId = override.activityId !== undefined ? override.activityId : (
-      workspaceActivity?.id || workspaceActivityId || selectedActivity?.id || selectedActivityId || null
+      workspaceModalOpen ? (workspaceActivity?.id || workspaceActivityId || null) :
+      detailsModalOpen ? (selectedActivity?.id || selectedActivityId || null) : null
     );
     const actObj = override.activity !== undefined ? override.activity : (
-      (actId && activities.find(a => a.id === actId)) || workspaceActivity || selectedActivity || null
+      (actId && activities.find(a => a.id === actId)) || null
     );
     const tId = override.tetraId !== undefined ? override.tetraId : workspaceTetraId;
-    const sId = override.subjectId !== undefined ? override.subjectId : workspaceSubjectId;
+    const sId = override.subjectId !== undefined ? override.subjectId : (
+      workspaceModalOpen && workspaceMode === 'subject' ? (workspaceSubjectId || null) : null
+    );
     const allSubjects = (academicStructure || []).flatMap(t => (t.subjects || []).map(s => ({ ...s, tetraId: t.id, tetraName: t.name })));
     const subjObj = override.subject !== undefined ? override.subject : (
       (sId && allSubjects.find(s => s.id === sId)) || null
@@ -416,7 +412,11 @@ export function App() {
         const targetMode = (nav.workspaceMode === 'subject' || nav.modal === 'subject_resources') ? 'subject' : 'activity';
         setWorkspaceMode(targetMode);
         if (nav.tetraId) setWorkspaceTetraId(nav.tetraId);
-        if (nav.subjectId) setWorkspaceSubjectId(nav.subjectId);
+        if (nav.subjectId) {
+          setWorkspaceSubjectId(nav.subjectId);
+        } else {
+          setWorkspaceSubjectId('');
+        }
         if (nav.activityId) {
           setWorkspaceActivityId(nav.activityId);
           const found = activities.find(a => a.id === nav.activityId);
@@ -424,6 +424,9 @@ export function App() {
             setSelectedActivity(found);
             setWorkspaceActivity(found);
           }
+        } else {
+          setWorkspaceActivityId(null);
+          setWorkspaceActivity(null);
         }
         setWorkspaceModalOpen(true);
         setConfigModalOpen(false);

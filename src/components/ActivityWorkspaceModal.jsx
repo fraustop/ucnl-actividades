@@ -146,7 +146,7 @@ export const ActivityWorkspaceModal = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [showSecurityExplanation, setShowSecurityExplanation] = useState(false);
 
-  // Sincronizar props de modo y selecciones
+  // Sincronizar props de modo y selecciones cuando cambian desde el padre
   useEffect(() => {
     if (initialMode) {
       setWorkspaceMode(initialMode);
@@ -154,54 +154,26 @@ export const ActivityWorkspaceModal = ({
   }, [initialMode]);
 
   useEffect(() => {
-    if (activity) {
-      setCurrentActivity(activity);
-    }
+    setCurrentActivity(activity || null);
   }, [activity]);
 
-  // Si no hay actividad seleccionada en modo actividad, auto-seleccionar la primera disponible
   useEffect(() => {
-    if (isOpen && workspaceMode === 'activity' && !currentActivity && activities && activities.length > 0) {
-      const defaultAct = activities[0];
-      setCurrentActivity(defaultAct);
-      if (onSelectActivity) {
-        onSelectActivity(defaultAct);
-      }
-    }
-  }, [isOpen, workspaceMode, currentActivity, activities, onSelectActivity]);
-
-  useEffect(() => {
-    if (initialTetraId) {
+    if (initialTetraId !== undefined && initialTetraId !== null) {
       setSelectedTetraId(initialTetraId);
     }
   }, [initialTetraId]);
 
   useEffect(() => {
-    if (initialSubjectId) {
-      setSelectedSubjectId(initialSubjectId);
+    if (initialSubjectId !== undefined) {
+      setSelectedSubjectId(initialSubjectId || '');
     }
   }, [initialSubjectId]);
 
-  // Auto-seleccionar primer tetra y primera materia si faltan o si se abre en modo materia
   useEffect(() => {
-    if (isOpen && academicStructure && academicStructure.length > 0) {
-      let tetra = academicStructure.find(t => t.id === selectedTetraId);
-      if (!tetra) {
-        tetra = academicStructure[0];
-        setSelectedTetraId(tetra.id);
-      }
-      if (tetra?.subjects?.length > 0) {
-        const subExists = tetra.subjects.some(s => s.id === selectedSubjectId);
-        if (!subExists || !selectedSubjectId) {
-          const firstSub = tetra.subjects[0];
-          setSelectedSubjectId(firstSub.id);
-          if (onSelectSubject && tetra.id && firstSub.id) {
-            onSelectSubject(tetra.id, firstSub.id);
-          }
-        }
-      }
+    if (academicStructure && academicStructure.length > 0 && !selectedTetraId) {
+      setSelectedTetraId(academicStructure[0]?.id || '');
     }
-  }, [isOpen, academicStructure, selectedTetraId, selectedSubjectId, onSelectSubject]);
+  }, [academicStructure, selectedTetraId]);
 
   // SuscripciÃƒÂ³n en tiempo real a los recursos de la materia
   useEffect(() => {
@@ -1267,7 +1239,7 @@ export const ActivityWorkspaceModal = ({
           {workspaceMode === 'subject' && selectedSubjectId && (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
               <div className="px-3 py-2 bg-slate-100 border-b border-slate-200 flex items-center gap-2 flex-shrink-0">
-                <button onClick={() => { setSelectedSubjectId(''); setActiveResource(null); setActiveTab('viewer'); }} className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-slate-200 transition cursor-pointer active:scale-95">
+                <button type="button" onClick={() => { setSelectedSubjectId(''); setActiveResource(null); setActiveTab('viewer'); if (onSelectSubject) onSelectSubject(selectedTetraId, ''); }} className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-slate-200 transition cursor-pointer active:scale-95">
                   <ArrowLeft className="w-3.5 h-3.5" /><span>Todas</span>
                 </button>
               </div>

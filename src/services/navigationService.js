@@ -248,11 +248,11 @@ export const saveNavigationState = (state, pushToHistory = false) => {
     timestamp: Date.now()
   };
 
-  // Mantener selecciones previas de workspace si en state vienen vacías o es cierre de modal
-  if (state.workspaceMode) fullState.workspaceMode = state.workspaceMode;
-  if (state.tetraId) fullState.tetraId = state.tetraId;
-  if (state.subjectId) fullState.subjectId = state.subjectId;
-  if (state.activityId) fullState.activityId = state.activityId;
+  // Si se pasa explícitamente un campo (incluso null para volver a la lista general), respetarlo
+  if ('workspaceMode' in state) fullState.workspaceMode = state.workspaceMode;
+  if ('tetraId' in state) fullState.tetraId = state.tetraId;
+  if ('subjectId' in state) fullState.subjectId = state.subjectId;
+  if ('activityId' in state) fullState.activityId = state.activityId;
 
   try {
     localStorage.setItem(LOCAL_STORAGE_NAV_KEY, JSON.stringify(fullState));
