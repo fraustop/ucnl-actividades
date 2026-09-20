@@ -31,7 +31,12 @@ import {
   Music,
   Image as ImageIcon,
   FolderOpen,
-  Info
+  Info,
+  Copy,
+  Check,
+  AppWindow,
+  Globe,
+  ShieldAlert
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ACTIVITY_TYPES } from '../types/constants';
@@ -88,6 +93,33 @@ export const ActivityWorkspaceModal = ({
   const [savingLink, setSavingLink] = useState(false);
   const [linkSuccess, setLinkSuccess] = useState('');
   const [linkError, setLinkError] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Abrir ventana emergente (Pop-out / Companion window)
+  const handleOpenPopout = (url) => {
+    if (!url) return;
+    const width = 1100;
+    const height = 800;
+    const left = Math.max(0, Math.round((window.screen.width - width) / 2));
+    const top = Math.max(0, Math.round((window.screen.height - height) / 2));
+    window.open(
+      url,
+      'ucnl_resource_window',
+      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes,status=yes`
+    );
+  };
+
+  // Copiar enlace al portapapeles
+  const handleCopyLink = async (url) => {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch (e) {
+      console.warn('No se pudo copiar:', e);
+    }
+  };
 
   // 1. Suscripción a comentarios en tiempo real
   useEffect(() => {
@@ -337,16 +369,49 @@ export const ActivityWorkspaceModal = ({
           </div>
 
           <div className="flex items-center space-x-1.5 flex-shrink-0">
-            {/* Si es Office / PDF, alternar entre visor directo y Google Docs Viewer */}
-            {(type === 'pdf' || type === 'office') && (
+            {/* Si es Office / PDF / Web, permitir alternar con Google Docs Viewer */}
+            {(type === 'pdf' || type === 'office' || type === 'web') && (
               <button
                 onClick={() => setUseGoogleDocsFallback(!useGoogleDocsFallback)}
-                className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                title="Alternar motor de visor (Google Docs / Motor nativo)"
+                className={`px-2 py-1 text-[10px] font-bold rounded-lg transition border ${
+                  useGoogleDocsFallback
+                    ? 'bg-blue-600 text-white border-blue-500 shadow-2xs'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+                title="Alternar entre visualizador directo y Google Docs Viewer (útil si la universidad bloquea la conexión)"
               >
-                {useGoogleDocsFallback ? 'Motor Nativo' : 'Google Docs Viewer'}
+                {useGoogleDocsFallback ? 'Modo Normal' : 'Google Docs Viewer'}
               </button>
             )}
+
+            {/* Botón de Ventana Paralela / Popout */}
+            <button
+              onClick={() => handleOpenPopout(originalUrl)}
+              className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition flex items-center gap-1 text-xs font-bold"
+              title="Abrir en Ventana Paralela / Emergente (Recomendado para páginas de la universidad que rechazan conexión)"
+            >
+              <AppWindow className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden md:inline text-[11px]">Ventana Paralela</span>
+            </button>
+
+            {/* Botón Copiar Enlace */}
+            <button
+              onClick={() => handleCopyLink(originalUrl)}
+              className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition flex items-center gap-1 text-xs font-bold"
+              title="Copiar enlace al portapapeles"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[11px] text-emerald-400 hidden sm:inline">Copiado</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-[11px] hidden sm:inline">Copiar</span>
+                </>
+              )}
+            </button>
 
             <button
               onClick={() => setIsFullscreenViewer(!isFullscreenViewer)}
@@ -361,7 +426,7 @@ export const ActivityWorkspaceModal = ({
               target="_blank"
               rel="noopener noreferrer"
               className="p-1.5 text-blue-400 hover:text-blue-300 rounded-lg hover:bg-slate-800 transition flex items-center gap-1 text-xs font-bold"
-              title="Abrir en pestaña externa"
+              title="Abrir en pestaña externa completa"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Abrir ↗</span>
@@ -456,29 +521,64 @@ export const ActivityWorkspaceModal = ({
             />
           )}
 
-          {/* 8. Web General / Iframe con fallback */}
+          {/* 8. Web General / Iframe con Asistente de Conexión */}
           {type === 'web' && (
             <div className="w-full h-full flex flex-col relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900">
-              <iframe
-                src={embedUrl}
-                title={title}
-                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-                className="w-full flex-1 border-0 bg-white"
-              />
-              <div className="p-2.5 bg-slate-900/95 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                <span className="text-[11px] truncate pr-2">
-                  Si la página restringe la incrustación por seguridad de origen:
-                </span>
-                <a
-                  href={originalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center space-x-1 flex-shrink-0"
-                >
-                  <span>Abrir en Pestaña Completa</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+              
+              {/* Barra informativa y de acciones rápidas para portales universitarios */}
+              <div className="px-3.5 py-2 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 flex-shrink-0">
+                <div className="flex items-center space-x-1.5 min-w-0">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                  <span className="text-[11px] text-slate-300 truncate">
+                    Si el portal de la universidad rechaza la conexión integrada (<span className="font-mono text-amber-300">X-Frame-Options</span>):
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => handleOpenPopout(originalUrl)}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 transition shadow-2xs cursor-pointer"
+                    title="Abre el portal en una ventana flotante al lado de la app para trabajar en simultáneo"
+                  >
+                    <AppWindow className="w-3 h-3" />
+                    <span>Ventana Paralela</span>
+                  </button>
+
+                  <a
+                    href={originalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 transition shadow-2xs"
+                  >
+                    <span>Pestaña Completa</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+
+                  <button
+                    onClick={() => handleCopyLink(originalUrl)}
+                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold text-[11px] flex items-center space-x-1 transition border border-slate-700 cursor-pointer"
+                  >
+                    {copiedLink ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedLink ? 'Copiado' : 'Copiar'}</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Iframe o Google Docs Fallback */}
+              {useGoogleDocsFallback ? (
+                <iframe
+                  src={googleViewerUrl}
+                  title={title}
+                  className="w-full flex-1 border-0 bg-slate-900"
+                />
+              ) : (
+                <iframe
+                  src={embedUrl}
+                  title={title}
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"
+                  className="w-full flex-1 border-0 bg-white"
+                />
+              )}
             </div>
           )}
 
