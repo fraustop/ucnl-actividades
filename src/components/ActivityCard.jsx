@@ -13,7 +13,8 @@ import {
   Video,
   MessagesSquare,
   MessageCircle,
-  GraduationCap
+  GraduationCap,
+  FolderOpen
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ACTIVITY_STATUSES, ACTIVITY_TYPES } from '../types/constants';
@@ -27,6 +28,7 @@ export const ActivityCard = ({
   onEdit,
   onDelete,
   onStatusChange,
+  onOpenWorkspace,
   isStudent = false,
   studentCompletions = {},
   onToggleStudentCompletion,
@@ -207,23 +209,43 @@ export const ActivityCard = ({
           </div>
         )}
 
-        {/* Botones de Acción de Estado (Completar / En Progreso / Pendiente) */}
-        <div className="flex items-center justify-between pt-1 gap-2">
+        {/* Botones de Acción de Estado (Completar / En Progreso / Pendiente) y Recursos */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between pt-1 gap-2">
           
-          {/* Adjuntos (visible en desktop) */}
-          <div className="hidden sm:flex items-center space-x-1.5 text-xs text-slate-500 truncate">
-            {attachmentsCount > 0 ? (
-              <span className="inline-flex items-center space-x-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md font-medium text-[11px] border border-blue-100">
-                <Paperclip className="w-3 h-3" />
-                <span>{attachmentsCount} {attachmentsCount === 1 ? 'archivo' : 'archivos'}</span>
-              </span>
-            ) : (
-              <span className="text-[11px] text-slate-400">Sin archivos</span>
-            )}
-          </div>
+          {/* Botón de Recursos y Visor Integrado */}
+          {onOpenWorkspace ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenWorkspace(activity);
+              }}
+              title="Abrir recursos, documentos, enlaces y visor integrado"
+              className="inline-flex items-center gap-1.5 text-xs font-bold min-h-[36px] px-3 py-1.5 rounded-xl text-blue-700 bg-blue-50 hover:bg-blue-100 hover:text-blue-800 border border-blue-200/90 transition active:scale-95 cursor-pointer shadow-2xs flex-shrink-0"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+              <span>Recursos</span>
+              {(attachmentsCount + linksCount > 0) && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-blue-200/80 text-blue-900 font-extrabold leading-none">
+                  {attachmentsCount + linksCount}
+                </span>
+              )}
+            </button>
+          ) : (
+            <div className="hidden sm:flex items-center space-x-1.5 text-xs text-slate-500 truncate">
+              {attachmentsCount > 0 ? (
+                <span className="inline-flex items-center space-x-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md font-medium text-[11px] border border-blue-100">
+                  <Paperclip className="w-3 h-3" />
+                  <span>{attachmentsCount} {attachmentsCount === 1 ? 'archivo' : 'archivos'}</span>
+                </span>
+              ) : (
+                <span className="text-[11px] text-slate-400">Sin archivos</span>
+              )}
+            </div>
+          )}
 
           {/* Botones de Cambio de Estado Personal */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-none justify-end">
             {isPending && (
               <>
                 <button

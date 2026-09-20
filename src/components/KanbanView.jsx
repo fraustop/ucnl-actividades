@@ -11,6 +11,7 @@ export const KanbanView = ({
   onEdit,
   onDelete,
   onStatusChange,
+  onOpenWorkspace,
   onOpenNewActivity,
   isStudent = false,
   studentCompletions = {},
@@ -205,6 +206,7 @@ export const KanbanView = ({
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onStatusChange={onStatusChange}
+                      onOpenWorkspace={onOpenWorkspace}
                       isStudent={isStudent}
                       studentCompletions={studentCompletions}
                       onToggleStudentCompletion={onToggleStudentCompletion}

@@ -764,6 +764,7 @@ export function App() {
                     onViewDetails={handleViewDetails}
                     onEdit={handleEditActivity}
                     onDelete={handleDeleteActivity}
+                    onOpenWorkspace={handleOpenWorkspace}
                     onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
                     studentCompletions={studentCompletions}
                     onToggleStudentCompletion={handleToggleStudentCompletion}
@@ -778,6 +779,7 @@ export function App() {
                     onViewDetails={handleViewDetails}
                     onEdit={handleEditActivity}
                     onDelete={handleDeleteActivity}
+                    onOpenWorkspace={handleOpenWorkspace}
                     onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
                     studentCompletions={studentCompletions}
                     onToggleStudentCompletion={handleToggleStudentCompletion}
@@ -790,6 +792,7 @@ export function App() {
                   <CalendarView
                     activities={filteredActivities}
                     onViewDetails={handleViewDetails}
+                    onOpenWorkspace={handleOpenWorkspace}
                     onOpenNewActivity={isAdmin ? (date) => handleOpenNewActivity(date) : null}
                     studentCompletions={studentCompletions}
                     selectedActivity={selectedActivity}

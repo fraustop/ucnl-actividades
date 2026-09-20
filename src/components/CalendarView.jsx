@@ -14,7 +14,7 @@ import {
   isToday
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, BookOpen, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, BookOpen, CheckCircle2, FolderOpen } from 'lucide-react';
 import { ACTIVITY_TYPES } from '../types/constants';
 import { useAuth } from '../context/AuthContext';
 import { compareActivitiesByDueDate } from '../utils/dateUtils';
@@ -23,6 +23,7 @@ export const CalendarView = ({
   activities = [],
   onViewDetails,
   onOpenNewActivity,
+  onOpenWorkspace,
   isStudent = false,
   studentCompletions = {}
 }) => {
@@ -291,15 +292,32 @@ export const CalendarView = ({
                     </div>
                   </div>
 
-                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold flex-shrink-0 ${
-                    isCompleted
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : isInProgress
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {isCompleted ? 'Lista' : isInProgress ? 'En Progreso' : 'Ver'}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {onOpenWorkspace && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenWorkspace(act);
+                        }}
+                        title="Abrir recursos"
+                        className="text-[11px] px-2.5 py-1 rounded-lg font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition inline-flex items-center gap-1 cursor-pointer shadow-2xs active:scale-95"
+                      >
+                        <FolderOpen className="w-3 h-3 text-blue-600" />
+                        <span>Recursos</span>
+                      </button>
+                    )}
+
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold flex-shrink-0 ${
+                      isCompleted
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : isInProgress
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}>
+                      {isCompleted ? 'Lista' : isInProgress ? 'En Progreso' : 'Ver'}
+                    </span>
+                  </div>
                 </div>
               );
             })}

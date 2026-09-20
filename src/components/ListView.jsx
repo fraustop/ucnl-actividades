@@ -10,6 +10,7 @@ export const ListView = ({
   onEdit,
   onDelete,
   onStatusChange,
+  onOpenWorkspace,
   onOpenNewActivity,
   isStudent = false,
   studentCompletions = {},
@@ -90,6 +91,7 @@ export const ListView = ({
               onEdit={onEdit}
               onDelete={onDelete}
               onStatusChange={onStatusChange}
+              onOpenWorkspace={onOpenWorkspace}
               isStudent={isStudent}
               studentCompletions={studentCompletions}
               onToggleStudentCompletion={onToggleStudentCompletion}
