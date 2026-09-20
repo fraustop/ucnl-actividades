@@ -68,7 +68,7 @@ export default function NotificationActivationReminder() {
   }
 
   return (
-    <div className="w-full bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 border-b-2 border-blue-500 text-white px-4 py-3 shadow-xl transition-all duration-300 relative z-30">
+    <div className="w-full bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 border-b-2 border-blue-500 text-white px-4 py-3 shadow-xl transition-all duration-300 relative z-20">
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         
         {/* Ícono y Mensaje */}

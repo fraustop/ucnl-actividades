@@ -78,7 +78,7 @@ export const AuthModal = ({ isOpen, onClose, initialMode = 'login', customMessag
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
       <div 
         className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md my-auto max-h-[92vh] flex flex-col overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}

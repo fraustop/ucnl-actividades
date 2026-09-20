@@ -477,7 +477,7 @@ export const ConfigModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Barra Superior: Pestañas con degradado azul oscuro y Botón Cerrar Rojo */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 border-b border-blue-900/60 px-3 sm:px-6 py-2 gap-2 flex-shrink-0 sticky top-0 z-30 shadow-md shadow-blue-950/25">
+        <div className="flex items-center justify-between bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 border-b border-blue-900/60 px-3 sm:px-6 py-2 gap-2 flex-shrink-0 sticky top-0 z-20 shadow-md shadow-blue-950/25">
           
           {/* Pestañas de Navegación */}
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll flex-1 min-w-0 py-0.5">
@@ -1627,7 +1627,7 @@ export const ConfigModal = ({
       {/* Modal Independiente para Registrar Nuevo Usuario */}
       {showRegisterUserModal && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150"
+          className="fixed inset-0 z-[500] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150"
           onClick={() => setShowRegisterUserModal(false)}
         >
           <div 

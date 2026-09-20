@@ -220,7 +220,7 @@ export const Navbar = ({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       title="Barra de Título: Doble clic para maximizar/restaurar | Arrastra para mover"
-      className="hidden sm:block sticky top-0 z-30 windows-titlebar-chrome w-full pwa-header-bar pwa-draggable-header flex-shrink-0 cursor-default select-none text-white transition-all overflow-visible"
+      className="hidden sm:block sticky top-0 z-[80] windows-titlebar-chrome w-full pwa-header-bar pwa-draggable-header flex-shrink-0 cursor-default select-none text-white transition-all overflow-visible"
     >
       <div className="w-full flex items-center justify-between h-8 pwa-header-container">
         
@@ -343,9 +343,15 @@ export const Navbar = ({
 
                 {/* Dropdown de usuario */}
                 {showUserMenu && (
-                  <div 
-                    className="absolute right-0 mt-1.5 w-60 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 z-50 text-slate-900 animate-in fade-in slide-in-from-top-1 duration-150"
-                  >
+                  <>
+                    {/* Backdrop invisible para cerrar al hacer clic afuera */}
+                    <div 
+                      className="fixed inset-0 z-40 bg-transparent" 
+                      onClick={() => setShowUserMenu(false)} 
+                    />
+                    <div 
+                      className="absolute right-0 mt-1.5 w-60 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 z-50 text-slate-900 animate-in fade-in slide-in-from-top-1 duration-150"
+                    >
                     <div className="px-3.5 py-2 border-b border-slate-100">
                       <p className="text-[11px] text-slate-400 font-medium">Conectado como</p>
                       <p className="text-xs font-bold text-slate-900 truncate">
@@ -419,8 +425,9 @@ export const Navbar = ({
                       </button>
                     </div>
                   </div>
-                )}
-              </div>
+                </>
+              )}
+            </div>
             ) : (
               <button
                 onClick={() => onOpenAuthModal('login')}

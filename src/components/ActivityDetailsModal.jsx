@@ -83,7 +83,7 @@ export const ActivityDetailsModal = ({
   return (
     <>
       {/* 1. MÓVIL: Pantalla Completa (Overlay nativo en pantallas pequeñas < md) */}
-      <div className="md:hidden fixed inset-0 z-50 w-full h-full bg-white flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+      <div className="md:hidden fixed inset-0 z-[500] w-full h-full bg-white flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
         
         {/* Encabezado Móvil */}
         <div className="px-4 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-2 flex-shrink-0">
