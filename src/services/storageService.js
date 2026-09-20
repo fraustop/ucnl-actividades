@@ -1,5 +1,7 @@
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from './firebase';
+export const CLOUDINARY_CONFIG = {
+  cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'u55avwrv',
+  uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'ucnl_uploads'
+};
 
 /**
  * Formatea el tamaño de bytes a un string legible (KB, MB, etc.)
@@ -33,61 +35,81 @@ export const getFileCategory = (fileName = '', mimeType = '') => {
 };
 
 /**
- * Sube un archivo a Firebase Storage con seguimiento de progreso
+ * Sube un archivo a Cloudinary con seguimiento de progreso en tiempo real
  */
-export const uploadAttachment = (file, activityFolderId, onProgress = () => {}) => {
+export const uploadAttachment = (file, activityFolderId = 'general', onProgress = () => {}) => {
   return new Promise((resolve, reject) => {
-    // Sanitizar nombre de archivo
-    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const timestamp = Date.now();
-    const storagePath = `activities/${activityFolderId || 'general'}/${timestamp}_${cleanFileName}`;
-    const storageRef = ref(storage, storagePath);
+    if (!file) {
+      return reject(new Error('No se ha seleccionado ningún archivo.'));
+    }
 
-    const uploadTask = uploadBytesResumable(storageRef, file, {
-      contentType: file.type || 'application/octet-stream'
-    });
+    const { cloudName, uploadPreset } = CLOUDINARY_CONFIG;
+    if (!cloudName || !uploadPreset) {
+      return reject(new Error('Configuración de almacenamiento incompleta.'));
+    }
 
-    uploadTask.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress(Math.round(progress));
-      },
-      (error) => {
-        console.error('Error al subir archivo a Firebase Storage:', error);
-        reject(error);
-      },
-      async () => {
+    // Endpoint de subida automática de Cloudinary
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', `ucnl_activities/${activityFolderId || 'general'}`);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+
+    // Seguimiento del progreso de subida para la barra en UI
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          const response = JSON.parse(xhr.responseText);
+          const timestamp = Date.now();
           const fileMetadata = {
             id: `${timestamp}_${Math.random().toString(36).substring(2, 9)}`,
             name: file.name,
-            size: file.size,
-            type: file.type,
+            size: response.bytes || file.size,
+            type: file.type || response.format || 'application/octet-stream',
             category: getFileCategory(file.name, file.type),
-            storagePath: storagePath,
-            downloadUrl: downloadUrl,
+            storagePath: response.public_id,
+            downloadUrl: response.secure_url || response.url,
+            provider: 'cloudinary',
             uploadedAt: new Date().toISOString()
           };
+          onProgress(100);
           resolve(fileMetadata);
         } catch (err) {
-          reject(err);
+          reject(new Error('Error al procesar la respuesta de Cloudinary: ' + err.message));
         }
+      } else {
+        let errorMsg = 'Error al subir el archivo a la nube.';
+        try {
+          const errorResp = JSON.parse(xhr.responseText);
+          if (errorResp?.error?.message) {
+            errorMsg = `Cloudinary: ${errorResp.error.message}`;
+          }
+        } catch (e) {}
+        reject(new Error(errorMsg));
       }
-    );
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Error de conexión al subir el archivo. Revisa tu conexión a internet.'));
+    };
+
+    xhr.send(formData);
   });
 };
 
 /**
- * Elimina un archivo de Firebase Storage
+ * Desvincular archivo
  */
 export const deleteAttachmentFromStorage = async (storagePath) => {
-  if (!storagePath) return;
-  try {
-    const fileRef = ref(storage, storagePath);
-    await deleteObject(fileRef);
-  } catch (error) {
-    console.warn('No se pudo borrar el archivo de storage o ya fue eliminado:', error.message);
-  }
+  console.info('Archivo desvinculado de la actividad:', storagePath);
 };

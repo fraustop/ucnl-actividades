@@ -44,7 +44,7 @@ import confetti from 'canvas-confetti';
 import { ACTIVITY_TYPES } from '../types/constants';
 import { formatFullDate, getDueBadgeInfo } from '../utils/dateUtils';
 import { getDirectActionInfo } from '../utils/textUtils';
-import { formatBytes } from '../services/storageService';
+import { formatBytes, uploadAttachment } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
 import FileIcon from './FileIcon';
 import RichTextRenderer from './RichTextRenderer';
@@ -205,6 +205,11 @@ export const ActivityWorkspaceModal = ({
     try {
       let commentAttachments = [];
       let commentLinks = [];
+
+      if (commentFile) {
+        const fileMeta = await uploadAttachment(commentFile, `comments_${activity.id}`);
+        commentAttachments.push(fileMeta);
+      }
 
       if (commentLinkInput.trim()) {
         commentLinks.push({
