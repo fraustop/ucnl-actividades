@@ -39,8 +39,8 @@ export const navStateToHash = (state) => {
     const tab = state.configTab || 'tetras';
     return `#/config/${tab}`;
   }
-  if (state.modal === 'workspace') {
-    if (state.workspaceMode === 'subject' || state.subjectId) {
+  if (state.modal === 'workspace' || state.modal === 'subject_resources' || state.modal === 'resources') {
+    if (state.workspaceMode === 'subject' || state.modal === 'subject_resources') {
       if (state.tetraId && state.subjectId) {
         return `#/workspace/subject/${encodeURIComponent(state.tetraId)}/${encodeURIComponent(state.subjectId)}`;
       }
@@ -49,22 +49,11 @@ export const navStateToHash = (state) => {
       }
       return '#/workspace/subject';
     }
+    // Modo Por Actividad
     if (state.activityId) {
       return `#/workspace/activity/${encodeURIComponent(state.activityId)}`;
     }
-    return '#/workspace';
-  }
-  if (state.modal === 'subject_resources') {
-    if (state.tetraId && state.subjectId) {
-      return `#/subject-resources/${encodeURIComponent(state.tetraId)}/${encodeURIComponent(state.subjectId)}`;
-    }
-    if (state.tetraId) {
-      return `#/subject-resources/${encodeURIComponent(state.tetraId)}`;
-    }
-    return '#/subject-resources';
-  }
-  if (state.modal === 'resources') {
-    return '#/resources';
+    return '#/workspace/activity';
   }
   if (state.modal === 'notifications') {
     return '#/notifications';
