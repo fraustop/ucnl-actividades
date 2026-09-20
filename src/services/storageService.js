@@ -48,12 +48,21 @@ export const uploadAttachment = (file, activityFolderId = 'general', onProgress 
       return reject(new Error('Configuración de almacenamiento incompleta.'));
     }
 
-    // Endpoint de subida automática de Cloudinary
-    const url = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
+    // Determinar el tipo de recurso Cloudinary según la categoría del archivo.
+    // Usar /raw/upload para PDFs y documentos evita que Cloudinary los clasifique
+    // erróneamente como imágenes (lo que genera URLs inaccesibles con error 401/404).
+    const fileCategory = getFileCategory(file.name, file.type);
+    let cloudinaryResourceType = 'raw'; // default seguro para documentos
+    if (fileCategory === 'image') cloudinaryResourceType = 'image';
+    else if (fileCategory === 'video') cloudinaryResourceType = 'video';
+    // PDF, Word, Excel, PPT, audio, code, archive → 'raw'
+
+    const url = `https://api.cloudinary.com/v1_1/${cloudName}/${cloudinaryResourceType}/upload`;
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', uploadPreset);
     formData.append('folder', `ucnl_activities/${activityFolderId || 'general'}`);
+
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
