@@ -332,6 +332,21 @@ export function App() {
 
   // Función unificada para persistir y sincronizar el estado de navegación
   const syncNav = (override = {}, pushHistory = true) => {
+    const actId = override.activityId !== undefined ? override.activityId : (
+      workspaceModalOpen ? (workspaceActivity?.id || selectedActivity?.id || selectedActivityId) :
+      detailsModalOpen ? (selectedActivity?.id || selectedActivityId) : null
+    );
+    const actObj = override.activity !== undefined ? override.activity : (
+      (actId && activities.find(a => a.id === actId)) || workspaceActivity || selectedActivity || null
+    );
+    const tId = override.tetraId !== undefined ? override.tetraId : workspaceTetraId;
+    const sId = override.subjectId !== undefined ? override.subjectId : workspaceSubjectId;
+    const allSubjects = (academicStructure || []).flatMap(t => (t.subjects || []).map(s => ({ ...s, tetraId: t.id, tetraName: t.name })));
+    const subjObj = override.subject !== undefined ? override.subject : (
+      (sId && allSubjects.find(s => s.id === sId)) || null
+    );
+    const currentWorkspaceMode = override.workspaceMode !== undefined ? override.workspaceMode : workspaceMode;
+
     const currentNav = {
       viewMode: override.viewMode !== undefined ? override.viewMode : viewMode,
       selectedTetra: override.selectedTetra !== undefined ? override.selectedTetra : selectedTetra,
@@ -339,18 +354,21 @@ export function App() {
       selectedStatus: override.selectedStatus !== undefined ? override.selectedStatus : selectedStatus,
       searchQuery: override.searchQuery !== undefined ? override.searchQuery : searchQuery,
       modal: override.modal !== undefined ? override.modal : (
-        workspaceModalOpen ? (workspaceMode === 'subject' ? 'subject_resources' : (workspaceActivity ? 'workspace' : 'resources')) :
+        workspaceModalOpen ? 'workspace' :
         configModalOpen ? 'config' :
         notificationDrawerOpen ? 'notifications' :
         activityModalOpen ? 'new_activity' :
         detailsModalOpen ? 'activity_details' : null
       ),
-      activityId: override.activityId !== undefined ? override.activityId : (
-        workspaceModalOpen ? (workspaceActivity?.id || selectedActivity?.id || selectedActivityId) :
-        detailsModalOpen ? (selectedActivity?.id || selectedActivityId) : null
-      ),
-      tetraId: override.tetraId !== undefined ? override.tetraId : workspaceTetraId,
-      subjectId: override.subjectId !== undefined ? override.subjectId : workspaceSubjectId,
+      workspaceMode: currentWorkspaceMode,
+      activityId: actId,
+      activity: actObj,
+      activities: override.activities !== undefined ? override.activities : activities,
+      tetraId: tId,
+      subjectId: sId,
+      subject: subjObj,
+      subjects: allSubjects,
+      academicStructure: override.academicStructure !== undefined ? override.academicStructure : academicStructure,
       configTab: override.configTab !== undefined ? override.configTab : configModalTab
     };
 
@@ -376,26 +394,30 @@ export function App() {
         setActivityModalOpen(false);
         setDetailsModalOpen(false);
         setWorkspaceModalOpen(false);
-      } else if (nav.modal === 'subject_resources') {
-        setWorkspaceTetraId(nav.tetraId || null);
-        setWorkspaceSubjectId(nav.subjectId || null);
-        setWorkspaceMode('subject');
-        setWorkspaceActivity(null);
+      } else if (nav.modal === 'workspace' || nav.modal === 'subject_resources' || nav.modal === 'resources') {
+        if (nav.workspaceMode === 'subject' || nav.modal === 'subject_resources' || nav.subjectId || nav.tetraId) {
+          setWorkspaceTetraId(nav.tetraId || null);
+          setWorkspaceSubjectId(nav.subjectId || null);
+          setWorkspaceMode('subject');
+          setWorkspaceActivity(null);
+        } else if (nav.activityId) {
+          setSelectedActivityId(nav.activityId);
+          const found = activities.find(a => a.id === nav.activityId);
+          if (found) {
+            setSelectedActivity(found);
+            setWorkspaceActivity(found);
+          }
+          setWorkspaceMode('activity');
+        } else {
+          setWorkspaceActivity(null);
+          setWorkspaceMode('activity');
+        }
         setWorkspaceModalOpen(true);
         setConfigModalOpen(false);
         setResourcesModalOpen(false);
         setNotificationDrawerOpen(false);
         setActivityModalOpen(false);
         setDetailsModalOpen(false);
-      } else if (nav.modal === 'resources') {
-        setWorkspaceActivity(null);
-        setWorkspaceMode('activity');
-        setWorkspaceModalOpen(true);
-        setConfigModalOpen(false);
-        setNotificationDrawerOpen(false);
-        setActivityModalOpen(false);
-        setDetailsModalOpen(false);
-        setResourcesModalOpen(false);
       } else if (nav.modal === 'notifications') {
         setNotificationDrawerOpen(true);
         setConfigModalOpen(false);
@@ -410,24 +432,6 @@ export function App() {
         setNotificationDrawerOpen(false);
         setDetailsModalOpen(false);
         setWorkspaceModalOpen(false);
-      } else if (nav.modal === 'workspace') {
-        if (nav.activityId) {
-          setSelectedActivityId(nav.activityId);
-          const found = activities.find(a => a.id === nav.activityId);
-          if (found) {
-            setSelectedActivity(found);
-            setWorkspaceActivity(found);
-          }
-        } else {
-          setWorkspaceActivity(null);
-        }
-        setWorkspaceMode('activity');
-        setWorkspaceModalOpen(true);
-        setDetailsModalOpen(false);
-        setConfigModalOpen(false);
-        setResourcesModalOpen(false);
-        setNotificationDrawerOpen(false);
-        setActivityModalOpen(false);
       } else if (nav.modal === 'activity_details' && nav.activityId) {
         setSelectedActivityId(nav.activityId);
         const found = activities.find(a => a.id === nav.activityId);
@@ -456,6 +460,7 @@ export function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activities]);
+
 
   const handleSetPersonalStatus = async (activityId, status) => {
     if (!currentUser) return;

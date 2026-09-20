@@ -14,10 +14,16 @@ export const DEFAULT_NAV_STATE = {
   selectedSubject: 'all',
   selectedStatus: 'pending', // 'all' | 'pending' | 'in_progress' | 'completed'
   searchQuery: '',
-  modal: null, // null | 'config' | 'resources' | 'subject_resources' | 'notifications' | 'activity_details' | 'new_activity'
-  activityId: null, // ID de la actividad cuando modal === 'activity_details'
-  tetraId: null, // ID del tetra para subject_resources
-  subjectId: null, // ID de la materia para subject_resources
+  modal: null, // null | 'config' | 'resources' | 'subject_resources' | 'workspace' | 'notifications' | 'activity_details' | 'new_activity'
+  workspaceMode: 'activity', // 'activity' | 'subject'
+  activityId: null, // ID de la actividad cuando modal === 'activity_details' o 'workspace'
+  activity: null, // Objeto completo de la actividad seleccionada
+  activities: [], // Lista de actividades activas
+  tetraId: null, // ID del tetramestre
+  subjectId: null, // ID de la materia seleccionada
+  subject: null, // Objeto o nombre de la materia seleccionada
+  subjects: [], // Lista de materias disponibles
+  academicStructure: [], // Estructura académica completa
   configTab: 'tetras', // 'tetras' | 'subjects' | 'users' | 'notifications'
   timestamp: Date.now()
 };
@@ -32,6 +38,21 @@ export const navStateToHash = (state) => {
   if (state.modal === 'config') {
     const tab = state.configTab || 'tetras';
     return `#/config/${tab}`;
+  }
+  if (state.modal === 'workspace') {
+    if (state.workspaceMode === 'subject' || state.subjectId) {
+      if (state.tetraId && state.subjectId) {
+        return `#/workspace/subject/${encodeURIComponent(state.tetraId)}/${encodeURIComponent(state.subjectId)}`;
+      }
+      if (state.tetraId) {
+        return `#/workspace/subject/${encodeURIComponent(state.tetraId)}`;
+      }
+      return '#/workspace/subject';
+    }
+    if (state.activityId) {
+      return `#/workspace/activity/${encodeURIComponent(state.activityId)}`;
+    }
+    return '#/workspace';
   }
   if (state.modal === 'subject_resources') {
     if (state.tetraId && state.subjectId) {
@@ -50,9 +71,6 @@ export const navStateToHash = (state) => {
   }
   if (state.modal === 'new_activity') {
     return '#/activity/new';
-  }
-  if (state.modal === 'workspace' && state.activityId) {
-    return `#/activity/${encodeURIComponent(state.activityId)}/workspace`;
   }
   if (state.modal === 'activity_details' && state.activityId) {
     return `#/activity/${encodeURIComponent(state.activityId)}`;
@@ -101,14 +119,31 @@ export const hashToNavState = (hash = '') => {
     state.configTab = pathSegments[1] || 'tetras';
     return state;
   }
+  if (pathSegments[0] === 'workspace') {
+    state.modal = 'workspace';
+    if (pathSegments[1] === 'subject') {
+      state.workspaceMode = 'subject';
+      if (pathSegments[2]) state.tetraId = decodeURIComponent(pathSegments[2]);
+      if (pathSegments[3]) state.subjectId = decodeURIComponent(pathSegments[3]);
+    } else if (pathSegments[1] === 'activity') {
+      state.workspaceMode = 'activity';
+      if (pathSegments[2]) state.activityId = decodeURIComponent(pathSegments[2]);
+    } else if (pathSegments[1]) {
+      state.workspaceMode = 'activity';
+      state.activityId = decodeURIComponent(pathSegments[1]);
+    }
+    return state;
+  }
   if (pathSegments[0] === 'subject-resources' || pathSegments[0] === 'subject_resources') {
-    state.modal = 'subject_resources';
+    state.modal = 'workspace';
+    state.workspaceMode = 'subject';
     if (pathSegments[1]) state.tetraId = decodeURIComponent(pathSegments[1]);
     if (pathSegments[2]) state.subjectId = decodeURIComponent(pathSegments[2]);
     return state;
   }
   if (pathSegments[0] === 'resources') {
-    state.modal = 'resources';
+    state.modal = 'workspace';
+    state.workspaceMode = 'activity';
     return state;
   }
   if (pathSegments[0] === 'notifications') {
@@ -120,6 +155,7 @@ export const hashToNavState = (hash = '') => {
       state.modal = 'new_activity';
     } else if (pathSegments[1] && pathSegments[2] === 'workspace') {
       state.modal = 'workspace';
+      state.workspaceMode = 'activity';
       state.activityId = decodeURIComponent(pathSegments[1]);
     } else if (pathSegments[1]) {
       state.modal = 'activity_details';
@@ -127,6 +163,7 @@ export const hashToNavState = (hash = '') => {
     }
     return state;
   }
+
 
   // Vistas estándar (kanban, list, calendar)
   if (['kanban', 'list', 'calendar'].includes(pathSegments[0])) {
