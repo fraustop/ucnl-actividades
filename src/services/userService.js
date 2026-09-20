@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { STORES, putInStore, getAllFromStore, deleteFromStore } from './indexedDbService';
+import { notifyAdminsNewUser } from './notificationService';
 
 export const SUPER_ADMIN_EMAIL = 'fraustop@outlook.com';
 
@@ -79,6 +80,9 @@ export const ensureAdminProfile = async (user, requestedRole = 'estudiante') => 
           createdAt: initialProfile.createdAt,
           read: false
         });
+
+        // Disparar notificación push remota a dispositivos de administradores
+        notifyAdminsNewUser(initialProfile).catch(() => {});
       } catch (errNotif) {
         console.warn('No se pudo registrar admin_notification:', errNotif);
       }
@@ -153,6 +157,9 @@ export const createAppUser = async ({ email, password, displayName, role = 'estu
         createdAt: profileData.createdAt,
         read: false
       });
+
+      // Disparar notificación push remota a dispositivos de administradores
+      notifyAdminsNewUser(profileData).catch(() => {});
     } catch (errNotif) {
       console.warn('No se pudo registrar admin_notification:', errNotif);
     }

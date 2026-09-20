@@ -26,7 +26,8 @@ import {
 import { 
   subscribeToStudentCompletions, 
   saveStudentCompletion,
-  confirmUserNotificationReceipt 
+  confirmUserNotificationReceipt,
+  subscribeToAdminNotifications
 } from './services/userService';
 import confetti from 'canvas-confetti';
 import { 
@@ -87,6 +88,9 @@ export function App() {
   const handleSelectActivityFromNotification = (activityId) => {
     const found = activities.find(a => a.id === activityId);
     if (found) {
+      if (configModalOpen) {
+        setConfigModalOpen(false);
+      }
       handleViewDetails(found);
     }
   };
@@ -228,6 +232,32 @@ export function App() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [currentUser]);
+
+  // 7. Escuchar notificaciones de administración en tiempo real (Nuevos usuarios registrados)
+  useEffect(() => {
+    if (!currentUser || !isAdmin) return;
+
+    const listenerStartTime = new Date().toISOString();
+    console.log('[AdminNotificationsListener] Iniciado para admin:', currentUser.email);
+
+    const unsubscribe = subscribeToAdminNotifications((notifs) => {
+      notifs.forEach((notif) => {
+        const notifCreatedAt = notif.createdAt || '';
+        if (notifCreatedAt > listenerStartTime && !notif.read) {
+          console.log('[AdminNotificationsListener] ✅ Nueva notificación de administración recibida:', notif.title);
+          emitLocalNotification(notif.title || '👤 Nuevo Usuario Registrado', {
+            body: notif.message || notif.body || 'Un nuevo usuario se ha registrado en la plataforma.',
+            tag: `admin_notif_${notif.id}`,
+            data: { url: '/', type: notif.type || 'new_user' }
+          });
+        }
+      });
+    }, (err) => {
+      console.warn('[AdminNotificationsListener] Error en listener de admin:', err);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser, isAdmin]);
 
 
   const handleSetPersonalStatus = async (activityId, status) => {
@@ -523,15 +553,6 @@ export function App() {
             />
           )}
 
-          {/* Panel de Notificaciones: En Desktop topa exactamente debajo del ribbon. En móvil ocupa toda la pantalla */}
-          {notificationDrawerOpen && (
-            <NotificationDrawer
-              isOpen={notificationDrawerOpen}
-              onClose={() => setNotificationDrawerOpen(false)}
-              onSelectActivity={handleSelectActivityFromNotification}
-            />
-          )}
-
         </div>
       )}
 
@@ -567,6 +588,15 @@ export function App() {
           onClose={() => setAuthModalState({ isOpen: false, mode: 'login', message: '' })}
           initialMode={authModalState.mode}
           customMessage={authModalState.message}
+        />
+      )}
+
+      {/* Panel de Notificaciones: Superior y por encima de todo */}
+      {notificationDrawerOpen && (
+        <NotificationDrawer
+          isOpen={notificationDrawerOpen}
+          onClose={() => setNotificationDrawerOpen(false)}
+          onSelectActivity={handleSelectActivityFromNotification}
         />
       )}
 

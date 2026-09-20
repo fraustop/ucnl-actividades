@@ -520,4 +520,37 @@ export const triggerDaily7DaysReminder = async (customUrl = null) => {
   }
 };
 
+/**
+ * Notifica a los administradores sobre un nuevo usuario registrado
+ */
+export const notifyAdminsNewUser = async (userProfile) => {
+  if (!userProfile) return;
+  const roleName = userProfile.role === 'admin' ? 'Administrador' : userProfile.role === 'docente' ? 'Docente' : 'Estudiante';
+  const title = `👤 Nuevo Usuario: ${userProfile.displayName || 'Estudiante'}`;
+  const body = `${userProfile.displayName || 'Un nuevo usuario'} (${userProfile.email}) se ha registrado en la plataforma como ${roleName}.`;
+
+  // Enviar notificación push mediante el backend para dispositivos admin
+  try {
+    const backendUrl = getBackendUrl();
+    await fetch(`${backendUrl}/api/notify/new-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        body,
+        user: {
+          uid: userProfile.uid,
+          email: userProfile.email,
+          displayName: userProfile.displayName,
+          role: userProfile.role
+        }
+      }),
+      signal: AbortSignal.timeout(6000)
+    }).catch(() => {});
+  } catch (e) {
+    console.warn('Error al notificar backend sobre nuevo usuario:', e);
+  }
+};
+
+
 

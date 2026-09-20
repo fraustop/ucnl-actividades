@@ -69,27 +69,50 @@ async function fetchExternalIp() {
   return externalIp;
 }
 
+const SUPER_ADMIN_EMAIL = 'fraustop@outlook.com';
+
 // ─── FCM: Obtener todos los tokens registrados ────────────────────────────────
 async function getAllFcmTokens(role = 'all') {
   const tokens = [];
   try {
     const snap = await db.collection('users').get();
-    snap.forEach((docSnap) => {
+    for (const docSnap of snap.docs) {
       const data = docSnap.data();
-      if (role !== 'all' && data.role !== role) return;
+      const isSuper = data.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+      const userRole = isSuper ? 'admin' : (data.role || 'estudiante');
 
+      if (role !== 'all' && userRole !== role) continue;
+
+      const userTokens = new Set();
       if (Array.isArray(data.fcmTokens)) {
-        data.fcmTokens.forEach((tok) => {
-          if (tok && !tokens.some(t => t.token === tok)) {
-            tokens.push({ token: tok, userId: docSnap.id, email: data.email, role: data.role });
+        data.fcmTokens.forEach(t => t && userTokens.add(t.trim()));
+      }
+      if (data.lastFcmToken && typeof data.lastFcmToken === 'string') {
+        userTokens.add(data.lastFcmToken.trim());
+      }
+      if (data.fcmToken && typeof data.fcmToken === 'string') {
+        userTokens.add(data.fcmToken.trim());
+      }
+
+      // Subcolección users/{uid}/tokens
+      try {
+        const subSnap = await db.collection('users').doc(docSnap.id).collection('tokens').get();
+        subSnap.forEach(tDoc => {
+          const tData = tDoc.data();
+          if (tData.token && typeof tData.token === 'string') {
+            userTokens.add(tData.token.trim());
+          } else if (tDoc.id && tDoc.id.length > 20) {
+            userTokens.add(tDoc.id.trim());
           }
         });
-      } else if (data.fcmToken) {
-        if (!tokens.some(t => t.token === data.fcmToken)) {
-          tokens.push({ token: data.fcmToken, userId: docSnap.id, email: data.email, role: data.role });
+      } catch (_) {}
+
+      userTokens.forEach((tok) => {
+        if (!tokens.some(t => t.token === tok)) {
+          tokens.push({ token: tok, userId: docSnap.id, email: data.email, role: userRole });
         }
-      }
-    });
+      });
+    }
   } catch (err) {
     console.error('❌ Error al obtener tokens FCM:', err.message);
   }
@@ -384,6 +407,39 @@ function listenToNotificationConfig() {
   }
 }
 
+function listenToAdminNotifications() {
+  const listenerStartTime = new Date().toISOString();
+  try {
+    db.collection('admin_notifications').onSnapshot((snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          const createdAt = data.createdAt || '';
+          if (createdAt <= listenerStartTime) return;
+
+          if (currentConfig.notifyNewUserToAdmins !== false) {
+            console.log(`👤 [Nuevo Usuario Detectado] Notificando a administradores: "${data.title || 'Nuevo Usuario'}"`);
+            const adminTokens = await getAllFcmTokens('admin');
+            if (adminTokens.length > 0) {
+              const title = data.title || '👤 Nuevo Usuario Registrado';
+              const body = data.message || `Nuevo usuario registrado en la plataforma.`;
+              await sendFcmPushToTokens(adminTokens, title, body, {
+                type: 'new_user',
+                userId: data.userId || ''
+              });
+              console.log(`   ✓ Push enviado a ${adminTokens.length} dispositivo(s) de administradores.`);
+            }
+          }
+        }
+      });
+    }, (err) => {
+      console.warn('⚠️ Listener de admin_notifications:', err.message);
+    });
+  } catch (err) {
+    console.warn('⚠️ No se pudo iniciar listener de admin_notifications:', err.message);
+  }
+}
+
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
 // GET /api/status
@@ -409,6 +465,31 @@ app.get('/api/status', async (req, res) => {
     lastEvaluatedDueCount,
     lastSentCount,
     timestamp: new Date().toISOString()
+  });
+});
+
+// POST /api/notify/new-user — Notificar a administradores sobre un nuevo usuario registrado
+app.post('/api/notify/new-user', async (req, res) => {
+  const { title, body, user } = req.body || {};
+  const notifTitle = title || '👤 Nuevo Usuario Registrado';
+  const notifBody = body || `${user?.displayName || 'Un usuario'} (${user?.email || ''}) se ha registrado.`;
+
+  console.log(`[API POST /api/notify/new-user] Notificando a administradores: "${notifTitle}"`);
+
+  const adminTokens = await getAllFcmTokens('admin');
+  let fcmResult = { sent: 0, failed: 0 };
+  if (adminTokens.length > 0) {
+    fcmResult = await sendFcmPushToTokens(adminTokens, notifTitle, notifBody, {
+      type: 'new_user',
+      userId: user?.uid || ''
+    });
+  }
+
+  res.json({
+    success: true,
+    message: `Notificación enviada a ${adminTokens.length} dispositivo(s) de administradores.`,
+    adminTokensCount: adminTokens.length,
+    fcmResult
   });
 });
 
@@ -516,4 +597,5 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log('====================================================');
 
   listenToNotificationConfig();
+  listenToAdminNotifications();
 });

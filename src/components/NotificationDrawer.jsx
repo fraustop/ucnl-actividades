@@ -227,100 +227,64 @@ export default function NotificationDrawer({
 
   return (
     <>
-      {/* 1. MÓVIL: Pantalla Completa (< md) */}
-      <div className="md:hidden fixed inset-0 z-50 w-full h-full bg-slate-900 text-slate-100 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
-        
-        {/* Encabezado Móvil */}
-        <div className="px-4 py-3.5 border-b border-slate-800 bg-slate-900 flex items-center justify-between gap-2 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-300 hover:text-white bg-slate-800 active:bg-slate-700 rounded-xl transition flex items-center gap-1.5 font-bold text-xs"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Volver</span>
-          </button>
+      {/* Fondo oscuro semitransparente que cubre cualquier modal o vista */}
+      <div 
+        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-[9998] animate-in fade-in duration-200"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-          <div className="flex items-center space-x-2">
-            <span className="font-extrabold text-sm text-white">Notificaciones</span>
-            {unreadCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white">
-                {unreadCount}
-              </span>
-            )}
-          </div>
-
-          {notifications.length > 0 ? (
-            <button
-              onClick={handleMarkAllAsRead}
-              disabled={unreadCount === 0}
-              className="p-2 text-blue-400 hover:text-blue-300 disabled:opacity-40 rounded-xl transition"
-              title="Marcar todas como leídas"
-            >
-              <CheckCheck className="w-4 h-4" />
-            </button>
-          ) : (
-            <div className="w-8" />
-          )}
-        </div>
-
-        {/* Acciones secundarias móvil */}
-        {notifications.length > 0 && (
-          <div className="px-4 py-2 bg-slate-800/60 border-b border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400 text-[11px]">
-              {unreadCount > 0 ? `${unreadCount} sin leer` : 'Al día'}
-            </span>
-            <button
-              onClick={handleClearAll}
-              className="inline-flex items-center space-x-1 text-slate-400 hover:text-rose-400 font-medium"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Vaciar historial</span>
-            </button>
-          </div>
-        )}
-
-        {/* Cuerpo Móvil */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 touch-scroll">
-          {renderNotificationList()}
-        </div>
-      </div>
-
-      {/* 2. DESKTOP: Panel Lateral Derecho — Topa exactamente debajo del ribbon y empuja/acompaña el contenido */}
-      <aside className="hidden md:flex w-[380px] lg:w-[420px] xl:w-[460px] flex-shrink-0 bg-slate-900 text-slate-100 border-l border-slate-800 shadow-2xl flex-col h-full self-stretch overflow-hidden animate-in slide-in-from-right duration-200 ease-out z-20">
-        
-        {/* Encabezado Desktop */}
-        <div className="px-5 py-3.5 border-b border-slate-800 bg-slate-900/95 flex items-center justify-between gap-3 flex-shrink-0">
+      {/* Panel Lateral Flotante por encima de todo */}
+      <aside 
+        className="fixed inset-y-0 right-0 z-[9999] w-full sm:max-w-md md:max-w-lg bg-slate-900 text-slate-100 border-l border-slate-800 shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200 ease-out"
+        role="dialog"
+        aria-label="Panel de Notificaciones"
+      >
+        {/* Encabezado Principal */}
+        <div className="px-4 sm:px-5 py-3.5 border-b border-slate-800 bg-slate-900/95 flex items-center justify-between gap-3 flex-shrink-0">
           <div className="flex items-center space-x-2.5 min-w-0">
+            {/* Botón Volver visible en móviles */}
+            <button
+              onClick={onClose}
+              className="sm:hidden p-1.5 text-slate-300 hover:text-white bg-slate-800 active:bg-slate-700 rounded-xl transition flex items-center gap-1 font-bold text-xs flex-shrink-0"
+              title="Volver"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+
             <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 flex-shrink-0">
               <Bell className="w-4 h-4" />
             </div>
+
             <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <h3 className="font-extrabold text-sm tracking-tight text-white">Notificaciones</h3>
+                <h3 className="font-extrabold text-sm sm:text-base tracking-tight text-white truncate">
+                  Notificaciones
+                </h3>
                 {unreadCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white shadow-xs">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white shadow-xs flex-shrink-0">
                     {unreadCount} {unreadCount === 1 ? 'nueva' : 'nuevas'}
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-slate-400">Historial en este equipo</p>
+              <p className="text-[10px] text-slate-400 truncate">Historial en este equipo</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 flex-shrink-0">
             {notifications.length > 0 && (
               <>
                 <button
                   onClick={handleMarkAllAsRead}
                   disabled={unreadCount === 0}
-                  className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg disabled:opacity-40 transition"
+                  className="p-1.5 sm:p-2 text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-xl disabled:opacity-40 transition"
                   title="Marcar todas como leídas"
                 >
                   <CheckCheck className="w-4 h-4" />
                 </button>
                 <button
                   onClick={handleClearAll}
-                  className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition"
+                  className="p-1.5 sm:p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-xl transition"
                   title="Vaciar todo el historial"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -329,26 +293,41 @@ export default function NotificationDrawer({
             )}
             <button
               onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition active:scale-95"
-              title="Cerrar panel lateral"
+              className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition active:scale-95"
+              title="Cerrar panel (Esc)"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Cuerpo Desktop */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 touch-scroll min-h-0">
+        {/* Acciones secundarias cuando hay notificaciones */}
+        {notifications.length > 0 && (
+          <div className="px-4 sm:px-5 py-2 bg-slate-800/60 border-b border-slate-800 flex items-center justify-between text-xs flex-shrink-0">
+            <span className="text-slate-400 text-[11px]">
+              {unreadCount > 0 ? `${unreadCount} sin leer` : 'Todas leídas'}
+            </span>
+            <button
+              onClick={handleClearAll}
+              className="inline-flex items-center space-x-1 text-slate-400 hover:text-rose-400 font-medium transition"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Vaciar historial</span>
+            </button>
+          </div>
+        )}
+
+        {/* Cuerpo Desplazable */}
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-2.5 touch-scroll min-h-0">
           {renderNotificationList()}
         </div>
 
-        {/* Pie Desktop */}
+        {/* Pie */}
         <div className="p-3 bg-slate-900 border-t border-slate-800 text-center flex-shrink-0">
           <p className="text-[10px] text-slate-500">
             Sincronizado con IndexedDB y Firebase
           </p>
         </div>
-
       </aside>
     </>
   );
