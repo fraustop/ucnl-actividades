@@ -154,14 +154,18 @@ export function App() {
   }, [currentUser]);
 
   // 2. Suscribirse a las tareas completadas por el usuario (progreso personal para todos los roles)
+  const [completionsLoaded, setCompletionsLoaded] = useState(false);
+
   useEffect(() => {
     if (!currentUser) {
       setStudentCompletions({});
+      setCompletionsLoaded(false);
       return;
     }
 
     const unsubscribe = subscribeToStudentCompletions(currentUser.uid, (completionsMap) => {
       setStudentCompletions(completionsMap || {});
+      setCompletionsLoaded(true);
     });
 
     return () => unsubscribe();
@@ -169,11 +173,11 @@ export function App() {
 
   // 3. Comprobar recordatorios locales de vencimiento (al abrir la app, 1 sola vez al día por dispositivo)
   useEffect(() => {
-    if (!currentUser || activities.length === 0) return;
+    if (!currentUser || !completionsLoaded || activities.length === 0) return;
 
-    // Comprobación al cargar actividades (controlado por localStorage para no repetir en el mismo día)
+    // Comprobación al cargar actividades y completados (controlado por localStorage para no repetir en el mismo día)
     checkAndTriggerLocalDueReminders(activities, studentCompletions, isStudent, false);
-  }, [currentUser, activities, studentCompletions, isStudent]);
+  }, [currentUser, completionsLoaded, activities, studentCompletions, isStudent]);
 
   // 4. Escuchar notificaciones en primer plano
   useEffect(() => {

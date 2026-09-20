@@ -173,8 +173,9 @@ export const emitLocalNotification = async (title, options = {}) => {
 
 
 /**
- * Evalúa las actividades pendientes y emite recordatorios locales según proximidad de entrega
- * (7 días, 4 días, 3 días o menos / vencidas). Se ejecuta una vez al día por dispositivo.
+ * Evalúa las actividades del estudiante y emite un recordatorio de RESUMEN consolidado
+ * con el conteo de tareas pendientes y en proceso (descartando estrictamente las completadas/terminadas).
+ * Se ejecuta 1 vez al día por dispositivo.
  */
 export const checkAndTriggerLocalDueReminders = async (
   activities = [],
@@ -199,79 +200,74 @@ export const checkAndTriggerLocalDueReminders = async (
     return;
   }
 
-  const dueAlerts = [];
+  const pendingList = [];
+  const inProgressList = [];
+  const upcomingDueList = [];
 
   activities.forEach((act) => {
-    if (!act.dueDate) return;
+    // 1. Descartar actividades canceladas o completadas globalmente
+    if (act.status === 'completed' || act.status === 'cancelled') return;
 
-    // Si el usuario ya la marcó como completada para sí mismo, no alertar
+    // 2. Descartar actividades marcadas como completadas/terminadas por el estudiante
     const userStatus = studentCompletions[act.id];
-    const isCompleted = userStatus === 'completed' || userStatus === true;
-    if (isCompleted) return;
+    if (userStatus === 'completed' || userStatus === true) {
+      return;
+    }
 
-    const dueDate = new Date(act.dueDate);
-    const diffTime = dueDate.getTime() - now.getTime();
-    const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    // 3. Clasificar entre en proceso y pendiente
+    if (userStatus === 'in_progress') {
+      inProgressList.push(act);
+    } else {
+      pendingList.push(act);
+    }
 
-    if (daysLeft === 7) {
-      dueAlerts.push({
-        type: '7days',
-        title: `🟢 Recordatorio (7 días): ${act.subject || 'Materia'}`,
-        body: `"${act.title}" vence en 7 días (${act.dueDate.replace('T', ' ')}).`,
-        act
-      });
-    } else if (daysLeft === 4) {
-      dueAlerts.push({
-        type: '4days',
-        title: `🟡 Recordatorio (4 días): ${act.subject || 'Materia'}`,
-        body: `Quedan 4 días para entregar "${act.title}".`,
-        act
-      });
-    } else if (daysLeft <= 3 && daysLeft >= 0) {
-      const urgencyText = daysLeft === 0 ? '¡VENCE HOY!' : daysLeft === 1 ? '¡Vence mañana!' : `Quedan ${daysLeft} días`;
-      dueAlerts.push({
-        type: 'urgent',
-        title: `🔴 Entrega Urgente (${urgencyText}): ${act.subject || 'Materia'}`,
-        body: `"${act.title}" tiene fecha límite inminente (${act.dueDate.replace('T', ' ')}).`,
-        act
-      });
-    } else if (daysLeft < 0 && daysLeft >= -1) {
-      dueAlerts.push({
-        type: 'overdue',
-        title: `⚠️ Actividad Vencida: ${act.subject || 'Materia'}`,
-        body: `"${act.title}" venció recientemente.`,
-        act
-      });
+    // 4. Evaluar si tiene fecha límite próxima (próximos 7 días o vencida hoy/ayer)
+    if (act.dueDate) {
+      const dueDate = new Date(act.dueDate);
+      const diffTime = dueDate.getTime() - now.getTime();
+      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (daysLeft <= 7 && daysLeft >= -1) {
+        upcomingDueList.push({ ...act, daysLeft });
+      }
     }
   });
 
-  if (dueAlerts.length === 0) return;
+  const totalActive = pendingList.length + inProgressList.length;
+
+  // Si todas las actividades están completadas o no hay tareas activas, no molestar con alertas
+  if (totalActive === 0) {
+    return;
+  }
 
   // Registrar fecha de la última comprobación diaria
   localStorage.setItem(LOCAL_STORAGE_DUE_CHECK_KEY, todayStr);
 
-  // Si es exactamente 1 actividad, mostrar recordatorio directo y conciso
-  if (dueAlerts.length === 1) {
-    const alert = dueAlerts[0];
-    await emitLocalNotification(alert.title, {
-      body: alert.body,
-      tag: `due_${todayStr}_${alert.act.id}`,
-      data: { activityId: alert.act.id, url: '/' }
-    });
-  } else {
-    // Si son 2 o más, emitir UN SOLO resumen consolidado para evitar spam
-    const urgentCount = dueAlerts.filter(a => a.type === 'urgent').length;
-    let summaryBody = `Tienes ${dueAlerts.length} actividades escolares con entrega esta semana.`;
-    if (urgentCount > 0) {
-      summaryBody = `Tienes ${urgentCount} entrega(s) urgente(s) y ${dueAlerts.length} tareas pendientes esta semana.`;
-    }
+  // Construir mensaje de resumen consolidado
+  const summaryTitle = '📋 Resumen de Actividades UCNL';
+  let summaryBody = '';
 
-    await emitLocalNotification('📋 Resumen de Entregas UCNL', {
-      body: summaryBody,
-      tag: `due_summary_${todayStr}`,
-      data: { url: '/' }
-    });
+  if (pendingList.length > 0 && inProgressList.length > 0) {
+    summaryBody = `Tienes ${totalActive} actividades escolares activas (${pendingList.length} pendiente${pendingList.length > 1 ? 's' : ''} y ${inProgressList.length} en proceso).`;
+  } else if (inProgressList.length > 0) {
+    summaryBody = `Tienes ${inProgressList.length} actividad${inProgressList.length > 1 ? 'es' : ''} en proceso de realización.`;
+  } else {
+    summaryBody = `Tienes ${pendingList.length} actividad${pendingList.length > 1 ? 'es' : ''} pendiente${pendingList.length > 1 ? 's' : ''} por entregar.`;
   }
+
+  if (upcomingDueList.length > 0) {
+    const urgentCount = upcomingDueList.filter(a => a.daysLeft <= 3).length;
+    if (urgentCount > 0) {
+      summaryBody += ` ⚠️ ${urgentCount} con entrega urgente en los próximos 3 días.`;
+    } else {
+      summaryBody += ` ${upcomingDueList.length} con entrega en los siguientes 7 días.`;
+    }
+  }
+
+  await emitLocalNotification(summaryTitle, {
+    body: summaryBody,
+    tag: `due_summary_${todayStr}`,
+    data: { url: '/' }
+  });
 };
 
 /**
