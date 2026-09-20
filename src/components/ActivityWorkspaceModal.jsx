@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   ArrowLeft, 
@@ -50,7 +50,7 @@ import confetti from 'canvas-confetti';
 import { ACTIVITY_TYPES } from '../types/constants';
 import { formatFullDate, getDueBadgeInfo } from '../utils/dateUtils';
 import { getDirectActionInfo } from '../utils/textUtils';
-import { formatBytes, uploadAttachment } from '../services/storageService';
+import { formatBytes, uploadAttachment, fixCloudinaryUrl } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
 import FileIcon from './FileIcon';
 import RichTextRenderer from './RichTextRenderer';
@@ -394,17 +394,20 @@ export const ActivityWorkspaceModal = ({
   // Seleccionar recurso para el visor integrado
   const handleSelectResource = (resource) => {
     setUseGoogleDocsFallback(false);
-    const info = getEmbedInfo(resource.url || resource.downloadUrl, resource.title || resource.name);
+    // Corregir URL de Cloudinary si fue subida con resource_type incorrecto (/image/ en lugar de /raw/)
+    const rawUrl = resource.url || resource.downloadUrl || '';
+    const correctedUrl = fixCloudinaryUrl(rawUrl, resource.category || resource.type || '');
+    const info = getEmbedInfo(correctedUrl, resource.title || resource.name);
     
     let googleViewerUrl = null;
     if (info.type === 'office' || info.type === 'pdf' || info.type === 'web') {
-      googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(resource.url || resource.downloadUrl)}&embedded=true`;
+      googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(correctedUrl)}&embedded=true`;
     }
 
     setActiveResource({
       ...info,
       title: resource.title || resource.name || info.title,
-      originalUrl: resource.url || resource.downloadUrl,
+      originalUrl: correctedUrl,
       googleViewerUrl: googleViewerUrl
     });
     setActiveTab('viewer');

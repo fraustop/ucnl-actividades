@@ -70,15 +70,18 @@ export const uploadAttachment = (file, activityFolderId = 'general', onProgress 
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response = JSON.parse(xhr.responseText);
+          const category = getFileCategory(file.name, file.type);
+          const rawDownloadUrl = response.secure_url || response.url;
           const timestamp = Date.now();
           const fileMetadata = {
             id: `${timestamp}_${Math.random().toString(36).substring(2, 9)}`,
             name: file.name,
             size: response.bytes || file.size,
             type: file.type || response.format || 'application/octet-stream',
-            category: getFileCategory(file.name, file.type),
+            category,
             storagePath: response.public_id,
-            downloadUrl: response.secure_url || response.url,
+            resourceType: response.resource_type || 'auto',
+            downloadUrl: fixCloudinaryUrl(rawDownloadUrl, category),
             provider: 'cloudinary',
             uploadedAt: new Date().toISOString()
           };
@@ -105,6 +108,19 @@ export const uploadAttachment = (file, activityFolderId = 'general', onProgress 
 
     xhr.send(formData);
   });
+};
+
+/**
+ * Corrects a Cloudinary URL that was saved with the wrong resource_type.
+ * Cloudinary /image/upload/ blocks non-image files (PDFs, docs, etc.) with 401.
+ * For those files, we swap to /raw/upload/ which allows direct download/view.
+ */
+export const fixCloudinaryUrl = (url = '', category = '') => {
+  if (!url || !url.includes('cloudinary.com')) return url;
+  const imageCategories = ['image'];
+  if (imageCategories.includes(category)) return url; // images stay as /image/upload/
+  // For pdf, word, excel, powerpoint, video, audio, code, archive, document → use /raw/upload/
+  return url.replace('/image/upload/', '/raw/upload/');
 };
 
 /**
