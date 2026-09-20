@@ -38,6 +38,12 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // Recursos por Materia (Archivos en Cloudinary, Enlaces y Programas por Materia/Tetra)
+    match /subject_resources/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
     // Perfiles de usuario y subcolecciones (completados y tokens FCM)
     match /users/{userId} {
       allow read: if request.auth != null;
