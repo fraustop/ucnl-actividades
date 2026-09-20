@@ -7,8 +7,14 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create, update, delete: if request.auth != null;
 
-      // Subcolección de comentarios y dudas en tiempo real
+      // Subcolección de comentarios y dudas en tiempo real (por documento individual)
       match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if request.auth != null;
+      }
+
+      // Hilos de comentarios y dudas agrupados por alumno (1 documento por alumno/actividad)
+      match /user_threads/{threadUserId} {
         allow read: if request.auth != null;
         allow create, update, delete: if request.auth != null;
       }

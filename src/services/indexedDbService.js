@@ -1,12 +1,13 @@
 const DB_NAME = 'UCNL_Actividades_DB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export const STORES = {
   ACTIVITIES: 'activities',
   ACADEMIC_STRUCTURE: 'academic_structure',
   SYNC_META: 'sync_meta',
   USER_COMPLETIONS: 'user_completions',
-  NOTIFICATIONS: 'notifications'
+  NOTIFICATIONS: 'notifications',
+  ACTIVITY_THREADS: 'activity_threads'
 };
 
 /**
@@ -49,6 +50,12 @@ export const openIndexedDB = () => {
         const notifStore = db.createObjectStore(STORES.NOTIFICATIONS, { keyPath: 'id' });
         notifStore.createIndex('timestamp', 'timestamp', { unique: false });
         notifStore.createIndex('isRead', 'isRead', { unique: false });
+      }
+
+      // Almacén para hilos de comentarios por alumno/actividad
+      if (!db.objectStoreNames.contains(STORES.ACTIVITY_THREADS)) {
+        const threadStore = db.createObjectStore(STORES.ACTIVITY_THREADS, { keyPath: 'threadKey' });
+        threadStore.createIndex('activityId', 'activityId', { unique: false });
       }
     };
 

@@ -4,12 +4,25 @@ import {
   addDoc, 
   deleteDoc, 
   doc, 
+  getDoc,
+  setDoc,
   query, 
   orderBy, 
   updateDoc 
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { ref as rtdbRef, update as rtdbUpdate } from 'firebase/database';
+import { db, rtdb } from './firebase';
 import { uploadAttachment } from './storageService';
+import { 
+  STORES, 
+  getAllFromStore, 
+  getFromStore, 
+  putInStore, 
+  deleteFromStore 
+} from './indexedDbService';
+
+export const FIRESTORE_DOC_MAX_BYTES = 1048576; // 1 MB (1,048,576 bytes)
+export const WARNING_DOC_BYTES_THRESHOLD = 891289; // 85% de 1 MB (~870 KB)
 
 /**
  * Detecta y genera la información de embebido y tipo de recurso para máxima compatibilidad
@@ -169,37 +182,130 @@ export const getEmbedInfo = (url = '', title = '') => {
 };
 
 /**
- * Suscripción en tiempo real a los comentarios de una actividad específica
+ * Calcula el tamaño exacto en bytes de un objeto/documento
  */
-export const subscribeToActivityComments = (activityId, onUpdate, onError) => {
-  if (!activityId) return () => {};
-
+export const calculateDocSizeBytes = (data) => {
   try {
-    const commentsRef = collection(db, 'activities', activityId, 'comments');
-    const q = query(commentsRef, orderBy('createdAt', 'asc'));
-
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const comments = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        }));
-        onUpdate(comments);
-      },
-      (error) => {
-        console.warn(`Error al escuchar comentarios de actividad ${activityId}:`, error);
-        if (onError) onError(error);
-      }
-    );
-  } catch (err) {
-    console.error('Error al inicializar listener de comentarios:', err);
-    return () => {};
+    const jsonString = JSON.stringify(data || {});
+    return new Blob([jsonString]).size;
+  } catch (e) {
+    return 0;
   }
 };
 
 /**
- * Publicar un nuevo comentario o duda en la actividad
+ * Aplana y ordena cronológicamente todos los mensajes de los distintos hilos de alumnos
+ */
+export const flattenAndSortMessages = (threadsList = []) => {
+  const allComments = [];
+  for (const thread of threadsList) {
+    if (Array.isArray(thread.messages)) {
+      for (const msg of thread.messages) {
+        allComments.push({
+          id: msg.id || `${thread.userId}_${msg.createdAt}`,
+          text: msg.text || '',
+          createdAt: msg.createdAt || new Date().toISOString(),
+          attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
+          links: Array.isArray(msg.links) ? msg.links : [],
+          userId: thread.userId,
+          userName: thread.userName || 'Estudiante UCNL',
+          userRole: thread.userRole || 'estudiante',
+          userEmail: thread.userEmail || ''
+        });
+      }
+    }
+  }
+  // Ordenar de forma cronológica estricta usando el timestamp de cada mensaje
+  return allComments.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+};
+
+/**
+ * Suscripción en tiempo real a los hilos de comentarios (1 documento por alumno/actividad)
+ */
+export const subscribeToActivityComments = (activityId, onUpdate, onError, currentUserId) => {
+  if (!activityId) return () => {};
+
+  let isUnsubscribed = false;
+
+  // Paso 1: Carga inmediata desde IndexedDB local (0 lecturas a la nube)
+  const loadLocalThreads = async () => {
+    try {
+      const allCachedThreads = await getAllFromStore(STORES.ACTIVITY_THREADS);
+      const activityThreads = (allCachedThreads || []).filter(t => t.activityId === activityId);
+      const sortedComments = flattenAndSortMessages(activityThreads);
+      const userThread = activityThreads.find(t => t.userId === currentUserId || t.id === currentUserId);
+      const userThreadBytes = userThread ? (userThread.sizeBytes || calculateDocSizeBytes(userThread)) : 0;
+
+      if (!isUnsubscribed) {
+        onUpdate({
+          comments: sortedComments,
+          userThreadBytes,
+          maxBytes: FIRESTORE_DOC_MAX_BYTES,
+          isFromCache: true
+        });
+      }
+    } catch (err) {
+      console.debug('Aviso IndexedDB threads cache:', err);
+    }
+  };
+
+  loadLocalThreads();
+
+  // Paso 2: Escuchar la subcolección user_threads
+  // Al comentar un alumno, solo se descarga ESE documento modificado
+  try {
+    const userThreadsRef = collection(db, 'activities', activityId, 'user_threads');
+
+    const unsubscribe = onSnapshot(
+      userThreadsRef,
+      async (snapshot) => {
+        try {
+          const threadsList = [];
+          for (const docSnap of snapshot.docs) {
+            const threadData = { id: docSnap.id, ...docSnap.data() };
+            const threadKey = `${activityId}_${docSnap.id}`;
+            const sizeBytes = docSnap.data().sizeBytes || calculateDocSizeBytes(docSnap.data());
+            const threadWithKey = { threadKey, ...threadData, sizeBytes };
+            threadsList.push(threadWithKey);
+            // Guardar en IndexedDB local
+            await putInStore(STORES.ACTIVITY_THREADS, threadWithKey);
+          }
+
+          const sortedComments = flattenAndSortMessages(threadsList);
+          const userThread = threadsList.find(t => t.userId === currentUserId || t.id === currentUserId);
+          const userThreadBytes = userThread ? (userThread.sizeBytes || calculateDocSizeBytes(userThread)) : 0;
+
+          if (!isUnsubscribed) {
+            onUpdate({
+              comments: sortedComments,
+              userThreadBytes,
+              maxBytes: FIRESTORE_DOC_MAX_BYTES,
+              isFromCache: false
+            });
+          }
+        } catch (procErr) {
+          console.error('Error al procesar hilos de comentarios:', procErr);
+        }
+      },
+      (error) => {
+        console.warn(`Error al escuchar hilos de actividad ${activityId}:`, error);
+        if (onError && !isUnsubscribed) onError(error);
+      }
+    );
+
+    return () => {
+      isUnsubscribed = true;
+      unsubscribe();
+    };
+  } catch (err) {
+    console.error('Error al inicializar listener de hilos:', err);
+    return () => { isUnsubscribed = true; };
+  }
+};
+
+/**
+ * Publicar un nuevo comentario agregándolo al documento de hilo del alumno (1 doc por alumno/actividad)
+ * Valida que no exceda el límite de 1 MB de Firestore.
  */
 export const addActivityComment = async (activityId, { text = '', attachments = [], links = [] }, user, userProfile) => {
   if (!activityId) throw new Error('ID de actividad requerido');
@@ -207,29 +313,109 @@ export const addActivityComment = async (activityId, { text = '', attachments = 
     throw new Error('El comentario no puede estar vacío');
   }
 
-  const commentData = {
+  const userId = user ? user.uid : 'anon';
+  const userName = userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Estudiante UCNL';
+  const userEmail = user?.email || '';
+  const userRole = userProfile?.role || 'estudiante';
+  const timestamp = new Date().toISOString();
+
+  const newMessage = {
+    id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     text: text.trim(),
     attachments: attachments || [],
     links: links || [],
-    userId: user ? user.uid : 'anon',
-    userName: userProfile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Usuario UCNL',
-    userEmail: user?.email || '',
-    userRole: userProfile?.role || 'estudiante',
-    createdAt: new Date().toISOString()
+    createdAt: timestamp
   };
 
-  const commentsRef = collection(db, 'activities', activityId, 'comments');
-  const docRef = await addDoc(commentsRef, commentData);
-  return { id: docRef.id, ...commentData };
+  const threadDocRef = doc(db, 'activities', activityId, 'user_threads', userId);
+  
+  // 1. Obtener mensajes existentes del alumno
+  let existingMessages = [];
+  try {
+    const threadSnap = await getDoc(threadDocRef);
+    if (threadSnap.exists()) {
+      existingMessages = threadSnap.data().messages || [];
+    } else {
+      const cached = await getFromStore(STORES.ACTIVITY_THREADS, `${activityId}_${userId}`);
+      if (cached && Array.isArray(cached.messages)) {
+        existingMessages = cached.messages;
+      }
+    }
+  } catch (e) {
+    console.debug('Inicializando hilo de alumno');
+  }
+
+  const updatedMessages = [...existingMessages, newMessage];
+
+  const threadData = {
+    activityId,
+    userId,
+    userName,
+    userEmail,
+    userRole,
+    messages: updatedMessages,
+    messageCount: updatedMessages.length,
+    updatedAt: timestamp
+  };
+
+  // 2. Medir tamaño en bytes del documento (Límite 1 MB de Firestore)
+  const sizeBytes = calculateDocSizeBytes(threadData);
+  if (sizeBytes > FIRESTORE_DOC_MAX_BYTES) {
+    throw new Error(`Has alcanzado el límite de 1 MB de comentarios (${(sizeBytes / 1024).toFixed(1)} KB / 1024 KB) para esta actividad. Por favor elimina comentarios antiguos para continuar.`);
+  }
+
+  const fullThreadData = { ...threadData, sizeBytes };
+
+  // 3. Guardar en Firestore (únicamente el documento del alumno que comentó)
+  await setDoc(threadDocRef, fullThreadData, { merge: true });
+
+  // 4. Guardar en IndexedDB local
+  await putInStore(STORES.ACTIVITY_THREADS, {
+    threadKey: `${activityId}_${userId}`,
+    ...fullThreadData
+  });
+
+  // 5. Emitir señal a RTDB para sincronización ultra-eficiente
+  try {
+    if (rtdb) {
+      const signalRef = rtdbRef(rtdb, `threads_signal/${activityId}/${userId}`);
+      await rtdbUpdate(signalRef, { v: Date.now(), updatedAt: timestamp });
+    }
+  } catch (rtdbErr) {}
+
+  return { message: newMessage, sizeBytes, maxBytes: FIRESTORE_DOC_MAX_BYTES };
 };
 
 /**
- * Eliminar un comentario de una actividad
+ * Eliminar un comentario del documento de hilo del alumno
  */
-export const deleteActivityComment = async (activityId, commentId) => {
+export const deleteActivityComment = async (activityId, commentId, authorUserId) => {
   if (!activityId || !commentId) return;
-  const commentDocRef = doc(db, 'activities', activityId, 'comments', commentId);
-  await deleteDoc(commentDocRef);
+
+  const targetUserId = authorUserId || 'anon';
+  const threadDocRef = doc(db, 'activities', activityId, 'user_threads', targetUserId);
+  const threadSnap = await getDoc(threadDocRef);
+
+  if (threadSnap.exists()) {
+    const data = threadSnap.data();
+    const filteredMessages = (data.messages || []).filter(m => m.id !== commentId);
+    const timestamp = new Date().toISOString();
+
+    const updatedThread = {
+      ...data,
+      messages: filteredMessages,
+      messageCount: filteredMessages.length,
+      updatedAt: timestamp
+    };
+    const sizeBytes = calculateDocSizeBytes(updatedThread);
+    const fullUpdated = { ...updatedThread, sizeBytes };
+
+    await setDoc(threadDocRef, fullUpdated);
+    await putInStore(STORES.ACTIVITY_THREADS, {
+      threadKey: `${activityId}_${targetUserId}`,
+      ...fullUpdated
+    });
+  }
 };
 
 /**

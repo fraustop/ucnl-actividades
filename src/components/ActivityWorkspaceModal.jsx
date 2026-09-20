@@ -75,6 +75,7 @@ export const ActivityWorkspaceModal = ({
 
   // Estados de Comentarios
   const [comments, setComments] = useState([]);
+  const [userThreadBytes, setUserThreadBytes] = useState(0);
   const [commentText, setCommentText] = useState('');
   const [commentLinkInput, setCommentLinkInput] = useState('');
   const [commentFile, setCommentFile] = useState(null);
@@ -130,14 +131,24 @@ export const ActivityWorkspaceModal = ({
     }
   };
 
-  // 1. Suscripción a comentarios en tiempo real
+  // 1. Suscripción a comentarios en tiempo real (1 documento por alumno/actividad)
   useEffect(() => {
     if (!isOpen || !activity?.id) return;
-    const unsubscribe = subscribeToActivityComments(activity.id, (loadedComments) => {
-      setComments(loadedComments || []);
-    });
+    const unsubscribe = subscribeToActivityComments(
+      activity.id,
+      (data) => {
+        if (Array.isArray(data)) {
+          setComments(data);
+        } else if (data && typeof data === 'object') {
+          setComments(data.comments || []);
+          setUserThreadBytes(data.userThreadBytes || 0);
+        }
+      },
+      (err) => console.error('Error cargando comentarios:', err),
+      currentUser?.uid
+    );
     return () => unsubscribe();
-  }, [isOpen, activity?.id]);
+  }, [isOpen, activity?.id, currentUser?.uid]);
 
   // 2. Cargar automáticamente el primer recurso o enlace si existe al abrir
   useEffect(() => {
@@ -245,10 +256,10 @@ export const ActivityWorkspaceModal = ({
   };
 
   // Eliminar comentario
-  const handleDeleteComment = async (commentId) => {
+  const handleDeleteComment = async (commentId, authorUserId) => {
     if (!window.confirm('¿Deseas eliminar este comentario?')) return;
     try {
-      await deleteActivityComment(activity.id, commentId);
+      await deleteActivityComment(activity.id, commentId, authorUserId || currentUser?.uid);
     } catch (err) {
       console.error('Error al borrar comentario:', err);
     }
@@ -1034,7 +1045,7 @@ export const ActivityWorkspaceModal = ({
                                 <span>{cmt.createdAt ? new Date(cmt.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                                 {canDelete && (
                                   <button
-                                    onClick={() => handleDeleteComment(cmt.id)}
+                                    onClick={() => handleDeleteComment(cmt.id, cmt.userId)}
                                     className="p-1 text-slate-400 hover:text-rose-400 rounded transition"
                                     title="Eliminar comentario"
                                   >
@@ -1073,6 +1084,27 @@ export const ActivityWorkspaceModal = ({
 
                   {/* Formulario de Entrada de Comentarios */}
                   <form onSubmit={handleSendComment} className="p-3.5 bg-slate-950 border-t border-slate-800 space-y-2 flex-shrink-0">
+                    {/* Medidor de Capacidad del Hilo del Alumno (1 MB Límite Firestore) */}
+                    <div className="flex items-center justify-between text-[11px] px-1 text-slate-400">
+                      <div className="flex items-center space-x-1.5">
+                        <span>Capacidad de tu hilo:</span>
+                        <span className={`font-mono font-bold ${
+                          userThreadBytes > 950000 ? 'text-rose-400' :
+                          userThreadBytes > 800000 ? 'text-amber-400' : 'text-slate-300'
+                        }`}>
+                          {formatBytes(userThreadBytes)} / 1 MB
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          ({((userThreadBytes / 1048576) * 100).toFixed(1)}%)
+                        </span>
+                      </div>
+                      {userThreadBytes > 800000 && (
+                        <span className="text-amber-400 text-[10px] font-semibold flex items-center gap-1">
+                          ⚠️ Tu documento está cerca del límite de 1 MB
+                        </span>
+                      )}
+                    </div>
+
                     {commentError && (
                       <div className="p-2 bg-rose-950 border border-rose-800 rounded-xl text-rose-200 text-xs">
                         {commentError}
