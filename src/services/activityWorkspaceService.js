@@ -461,3 +461,49 @@ export const uploadAndAddActivityAttachment = async (activityId, currentActivity
 
   return fileMeta;
 };
+
+/**
+ * Eliminar un archivo adjunto de una actividad
+ */
+export const deleteActivityAttachment = async (activityId, attachmentIdOrUrl) => {
+  if (!activityId || !attachmentIdOrUrl) return [];
+
+  const activityRef = doc(db, 'activities', activityId);
+  const snap = await getDoc(activityRef);
+  if (!snap.exists()) return [];
+
+  const currentAttachments = snap.data().attachments || [];
+  const updatedAttachments = currentAttachments.filter(
+    (a) => a.id !== attachmentIdOrUrl && a.downloadUrl !== attachmentIdOrUrl && a.storagePath !== attachmentIdOrUrl
+  );
+
+  await updateDoc(activityRef, {
+    attachments: updatedAttachments,
+    updatedAt: new Date().toISOString()
+  });
+
+  return updatedAttachments;
+};
+
+/**
+ * Eliminar un enlace web de una actividad
+ */
+export const deleteActivityLink = async (activityId, linkUrlOrTitle) => {
+  if (!activityId || !linkUrlOrTitle) return [];
+
+  const activityRef = doc(db, 'activities', activityId);
+  const snap = await getDoc(activityRef);
+  if (!snap.exists()) return [];
+
+  const currentLinks = snap.data().links || [];
+  const updatedLinks = currentLinks.filter(
+    (l) => l.url !== linkUrlOrTitle && l.title !== linkUrlOrTitle && l.id !== linkUrlOrTitle
+  );
+
+  await updateDoc(activityRef, {
+    links: updatedLinks,
+    updatedAt: new Date().toISOString()
+  });
+
+  return updatedLinks;
+};
