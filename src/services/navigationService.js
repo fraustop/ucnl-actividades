@@ -14,8 +14,10 @@ export const DEFAULT_NAV_STATE = {
   selectedSubject: 'all',
   selectedStatus: 'pending', // 'all' | 'pending' | 'in_progress' | 'completed'
   searchQuery: '',
-  modal: null, // null | 'config' | 'resources' | 'notifications' | 'activity_details' | 'new_activity'
+  modal: null, // null | 'config' | 'resources' | 'subject_resources' | 'notifications' | 'activity_details' | 'new_activity'
   activityId: null, // ID de la actividad cuando modal === 'activity_details'
+  tetraId: null, // ID del tetra para subject_resources
+  subjectId: null, // ID de la materia para subject_resources
   configTab: 'tetras', // 'tetras' | 'subjects' | 'users' | 'notifications'
   timestamp: Date.now()
 };
@@ -30,6 +32,15 @@ export const navStateToHash = (state) => {
   if (state.modal === 'config') {
     const tab = state.configTab || 'tetras';
     return `#/config/${tab}`;
+  }
+  if (state.modal === 'subject_resources') {
+    if (state.tetraId && state.subjectId) {
+      return `#/subject-resources/${encodeURIComponent(state.tetraId)}/${encodeURIComponent(state.subjectId)}`;
+    }
+    if (state.tetraId) {
+      return `#/subject-resources/${encodeURIComponent(state.tetraId)}`;
+    }
+    return '#/subject-resources';
   }
   if (state.modal === 'resources') {
     return '#/resources';
@@ -88,6 +99,12 @@ export const hashToNavState = (hash = '') => {
   if (pathSegments[0] === 'config') {
     state.modal = 'config';
     state.configTab = pathSegments[1] || 'tetras';
+    return state;
+  }
+  if (pathSegments[0] === 'subject-resources' || pathSegments[0] === 'subject_resources') {
+    state.modal = 'subject_resources';
+    if (pathSegments[1]) state.tetraId = decodeURIComponent(pathSegments[1]);
+    if (pathSegments[2]) state.subjectId = decodeURIComponent(pathSegments[2]);
     return state;
   }
   if (pathSegments[0] === 'resources') {

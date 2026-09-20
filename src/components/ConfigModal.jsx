@@ -37,7 +37,8 @@ import {
   Globe,
   Wifi,
   Info,
-  ChevronRight
+  ChevronRight,
+  FolderOpen
 } from 'lucide-react';
 import { 
   createAppUser, 
@@ -64,7 +65,8 @@ export const ConfigModal = ({
   isAdmin = false,
   currentUser = null,
   initialTab = 'tetras',
-  onTabChange = null
+  onTabChange = null,
+  onOpenSubjectResources = null
 }) => {
   const [activeTab, setActiveTab] = useState(initialTab || 'tetras');
 
@@ -802,7 +804,20 @@ export const ConfigModal = ({
                         </div>
                       )}
 
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onOpenSubjectResources) {
+                              onOpenSubjectResources(currentTetra?.id, sub.id);
+                            }
+                          }}
+                          className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-100/80 hover:bg-blue-600 hover:text-white rounded-xl transition border border-blue-200/80 shadow-2xs cursor-pointer active:scale-95"
+                          title="Ver y gestionar recursos, libros y archivos de esta materia"
+                        >
+                          <FolderOpen className="w-3.5 h-3.5" />
+                          <span>Recursos</span>
+                        </button>
                         <button
                           onClick={() => {
                             setEditingSubjectId(sub.id);
