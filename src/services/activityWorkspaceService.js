@@ -56,7 +56,142 @@ export const getEmbedInfo = (url = '', title = '') => {
   }
 
   // Detectar si proviene de la plataforma Moodle / institucional UCNL
-  const isMoodle = /(?:licenciatura\.)?ucnl\.edu\.mx|pluginfile\.php|\/mod_\w+\//i.test(cleanUrl);
+  const isUcnl = /(?:licenciatura\.|preparatoria\.|maestria\.)?ucnl\.edu\.mx/i.test(cleanUrl);
+  const isMoodle = isUcnl || /pluginfile\.php|\/mod_\w+\/|\/course\/(?:view|section)\.php|\/grade\/report\//i.test(cleanUrl);
+
+  // Extraer información detallada de la sección institucional si aplica
+  let moodleInfo = null;
+  if (isMoodle) {
+    let sectionKey = 'general';
+    let sectionLabel = 'Campus Virtual UCNL';
+    let sectionTag = 'Portal Institucional';
+    let sectionIcon = 'globe';
+    let actionText = 'Abrir en Campus Virtual';
+    let sectionTip = 'Portal institucional protegido de la Universidad Ciudadana de Nuevo León.';
+
+    // 1. Tarea / Asignación
+    if (/\/mod\/assign\//i.test(cleanUrl) || /\/mod_assign\//i.test(cleanUrl)) {
+      sectionKey = 'assign';
+      sectionLabel = 'Tarea / Asignación en Campus Virtual';
+      sectionTag = 'Tarea Oficial';
+      sectionIcon = 'task';
+      actionText = 'Abrir Tarea en Campus Virtual';
+      sectionTip = 'Revisa la rúbrica de evaluación, descarga las plantillas de apoyo y entrega tus documentos antes de la fecha límite.';
+    } 
+    // 2. Cuestionario / Examen / Autoevaluación
+    else if (/\/mod\/quiz\//i.test(cleanUrl) || /\/mod_quiz\//i.test(cleanUrl)) {
+      sectionKey = 'quiz';
+      sectionLabel = 'Cuestionario / Examen Virtual';
+      sectionTag = 'Evaluación en Línea';
+      sectionIcon = 'quiz';
+      actionText = 'Responder Cuestionario en Campus';
+      sectionTip = 'Asegúrate de contar con una conexión a internet estable y tiempo suficiente antes de iniciar tu intento.';
+    }
+    // 3. Foro de Discusión / Avisos
+    else if (/\/mod\/forum\//i.test(cleanUrl) || /\/mod_forum\//i.test(cleanUrl)) {
+      sectionKey = 'forum';
+      sectionLabel = 'Foro de Discusión y Avisos';
+      sectionTag = 'Foro Académico';
+      sectionIcon = 'forum';
+      actionText = 'Participar en el Foro';
+      sectionTip = 'Revisa las participaciones de tu profesor y compañeros de clase y comparte tus aportes según la rúbrica.';
+    }
+    // 4. Aula Virtual / Materia
+    else if (/\/course\/(?:view|section|index)\.php/i.test(cleanUrl) || /\/course\//i.test(cleanUrl)) {
+      sectionKey = 'course';
+      sectionLabel = 'Aula Virtual de la Materia';
+      sectionTag = 'Materia / Curso';
+      sectionIcon = 'course';
+      actionText = 'Ir al Aula Virtual de la Materia';
+      sectionTip = 'Encuentra las unidades temáticas, avisos, lecturas y cronograma oficial de la materia.';
+    }
+    // 5. Lectura / Página Temática
+    else if (/\/mod\/page\//i.test(cleanUrl) || /\/mod\/lesson\//i.test(cleanUrl) || /\/mod_page\//i.test(cleanUrl)) {
+      sectionKey = 'page';
+      sectionLabel = 'Página de Lectura / Lección';
+      sectionTag = 'Lectura Oficial';
+      sectionIcon = 'page';
+      actionText = 'Leer Contenido en Campus';
+      sectionTip = 'Lectura estructurada y material didáctico preparado para esta unidad temática.';
+    }
+    // 6. Carpeta de Documentos (Folder)
+    else if (/\/mod\/folder\//i.test(cleanUrl) || /\/mod_folder\//i.test(cleanUrl)) {
+      sectionKey = 'folder';
+      sectionLabel = 'Carpeta de Documentos y Recursos';
+      sectionTag = 'Colección de Archivos';
+      sectionIcon = 'folder';
+      actionText = 'Abrir Carpeta en Campus';
+      sectionTip = 'Colección de manuales, lecturas complementarias y guías de estudio.';
+    }
+    // 7. Sala de Clase Virtual / Videoconferencia (BigBlueButton)
+    else if (/\/mod\/bigbluebuttonbn\//i.test(cleanUrl) || /\/mod_bigbluebuttonbn\//i.test(cleanUrl)) {
+      sectionKey = 'live_class';
+      sectionLabel = 'Sala de Asesoría Virtual / Clase en Vivo';
+      sectionTag = 'Sesión en Vivo';
+      sectionIcon = 'video';
+      actionText = 'Entrar a la Sesión en Vivo';
+      sectionTip = 'Sala virtual para clases sincrónicas y sesiones de asesoría con tu docente.';
+    }
+    // 8. Calificaciones
+    else if (/\/grade\//i.test(cleanUrl)) {
+      sectionKey = 'grades';
+      sectionLabel = 'Libro de Calificaciones UCNL';
+      sectionTag = 'Calificaciones Oficiales';
+      sectionIcon = 'grades';
+      actionText = 'Consultar Calificaciones';
+      sectionTip = 'Consulta tus puntajes acumulados, ponderaciones y comentarios de retroalimentación.';
+    }
+    // 9. Calendario
+    else if (/\/calendar\//i.test(cleanUrl)) {
+      sectionKey = 'calendar';
+      sectionLabel = 'Calendario Académico UCNL';
+      sectionTag = 'Agenda Institucional';
+      sectionIcon = 'calendar';
+      actionText = 'Ver Calendario en Campus';
+      sectionTip = 'Consulta las fechas clave, entregas programadas y cierres del ciclo escolar.';
+    }
+    // 10. Mensajería
+    else if (/\/message\//i.test(cleanUrl)) {
+      sectionKey = 'messages';
+      sectionLabel = 'Mensajería Institucional';
+      sectionTag = 'Mensajes con Docentes';
+      sectionIcon = 'messages';
+      actionText = 'Abrir Bandeja de Mensajes';
+      sectionTip = 'Comunícate de manera oficial con tus profesores y compañeros de clase.';
+    }
+    // 11. Área Personal / Dashboard / Inicio
+    else if (/\/my\//i.test(cleanUrl) || /\/login\//i.test(cleanUrl) || cleanUrl.endsWith('ucnl.edu.mx/') || cleanUrl.endsWith('ucnl.edu.mx')) {
+      sectionKey = 'dashboard';
+      sectionLabel = 'Campus Virtual UCNL - Licenciatura';
+      sectionTag = 'Portal Estudiantil';
+      sectionIcon = 'dashboard';
+      actionText = 'Entrar al Campus Virtual';
+      sectionTip = 'Acceso a tu tablero de asignaturas activas, avisos universitarios y servicios escolares.';
+    }
+
+    // Extraer identificadores si existen
+    let moodleId = null;
+    const idMatch = cleanUrl.match(/[?&]id=(\d+)/);
+    if (idMatch) {
+      moodleId = idMatch[1];
+    }
+    let moodleDiscussId = null;
+    const dMatch = cleanUrl.match(/[?&]d=(\d+)/);
+    if (dMatch) {
+      moodleDiscussId = dMatch[1];
+    }
+
+    moodleInfo = {
+      sectionKey,
+      sectionLabel,
+      sectionTag,
+      sectionIcon,
+      actionText,
+      sectionTip,
+      moodleId,
+      moodleDiscussId
+    };
+  }
 
   // 1. YouTube
   // Formatos: youtube.com/watch?v=ID, youtu.be/ID, youtube.com/embed/ID, youtube.com/shorts/ID
@@ -139,6 +274,10 @@ export const getEmbedInfo = (url = '', title = '') => {
       originalUrl: cleanUrl,
       embedUrl: cleanUrl,
       title: title || extractedFileName || 'Reproductor de Video',
+      fileName: extractedFileName || '',
+      isMoodle: isMoodle,
+      isUcnl: isUcnl,
+      moodleInfo: moodleInfo,
       icon: 'video'
     };
   }
@@ -151,6 +290,10 @@ export const getEmbedInfo = (url = '', title = '') => {
       originalUrl: cleanUrl,
       embedUrl: cleanUrl,
       title: title || extractedFileName || 'Reproductor de Audio',
+      fileName: extractedFileName || '',
+      isMoodle: isMoodle,
+      isUcnl: isUcnl,
+      moodleInfo: moodleInfo,
       icon: 'audio'
     };
   }
@@ -163,6 +306,10 @@ export const getEmbedInfo = (url = '', title = '') => {
       originalUrl: cleanUrl,
       embedUrl: cleanUrl,
       title: title || extractedFileName || 'Visualizador de Imagen',
+      fileName: extractedFileName || '',
+      isMoodle: isMoodle,
+      isUcnl: isUcnl,
+      moodleInfo: moodleInfo,
       icon: 'image'
     };
   }
@@ -180,6 +327,8 @@ export const getEmbedInfo = (url = '', title = '') => {
       fileName: extractedFileName || title || 'Documento.pdf',
       fileExt: 'pdf',
       isMoodle: isMoodle,
+      isUcnl: isUcnl,
+      moodleInfo: moodleInfo,
       icon: 'pdf'
     };
   }
@@ -216,6 +365,8 @@ export const getEmbedInfo = (url = '', title = '') => {
       googleViewerUrl: `https://docs.google.com/viewer?url=${encodeURIComponent(cleanUrl)}&embedded=true`,
       title: title || extractedFileName || platform,
       isMoodle: isMoodle,
+      isUcnl: isUcnl,
+      moodleInfo: moodleInfo,
       icon: 'document'
     };
   }
@@ -232,21 +383,43 @@ export const getEmbedInfo = (url = '', title = '') => {
       embedUrl: cleanUrl,
       title: title || extractedFileName || 'Archivo Comprimido',
       isMoodle: isMoodle,
+      isUcnl: isUcnl,
+      moodleInfo: moodleInfo,
       icon: 'archive'
     };
   }
 
-  // 11. Web general / Portal / Iframe genérico
+  // 11. Secciones del Campus Virtual UCNL (Moodle) o Web general
+  if (isMoodle) {
+    return {
+      type: 'moodle_section',
+      platform: moodleInfo?.sectionLabel || 'Campus Virtual UCNL',
+      originalUrl: cleanUrl,
+      downloadUrl: cleanUrl,
+      embedUrl: cleanUrl,
+      googleViewerUrl: `https://docs.google.com/viewer?url=${encodeURIComponent(cleanUrl)}&embedded=true`,
+      title: title || moodleInfo?.sectionLabel || 'Campus Virtual UCNL',
+      fileName: extractedFileName || '',
+      isMoodle: true,
+      isUcnl: isUcnl,
+      moodleInfo: moodleInfo,
+      icon: moodleInfo?.sectionIcon || 'globe'
+    };
+  }
+
+  // 12. Web general / Portal / Iframe genérico
   return {
     type: 'web',
-    platform: isMoodle ? 'Plataforma UCNL (Moodle)' : 'Enlace Web',
+    platform: 'Enlace Web',
     originalUrl: cleanUrl,
     downloadUrl: cleanUrl,
     embedUrl: cleanUrl,
     googleViewerUrl: `https://docs.google.com/viewer?url=${encodeURIComponent(cleanUrl)}&embedded=true`,
     title: title || extractedFileName || cleanUrl,
     fileName: extractedFileName || '',
-    isMoodle: isMoodle,
+    isMoodle: false,
+    isUcnl: false,
+    moodleInfo: null,
     icon: 'globe'
   };
 };

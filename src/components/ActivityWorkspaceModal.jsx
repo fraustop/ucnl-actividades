@@ -120,6 +120,7 @@ export const ActivityWorkspaceModal = ({
   const [activeResource, setActiveResource] = useState(null);
   const [isFullscreenViewer, setIsFullscreenViewer] = useState(false);
   const [useGoogleDocsFallback, setUseGoogleDocsFallback] = useState(false);
+  const [showMoodleIframe, setShowMoodleIframe] = useState(false);
 
   // Estados de Comentarios (Por Actividad)
   const [comments, setComments] = useState([]);
@@ -228,6 +229,7 @@ export const ActivityWorkspaceModal = ({
   const handleSelectResource = useCallback((resource) => {
     if (!resource) return;
     setUseGoogleDocsFallback(false);
+    setShowMoodleIframe(false);
     const rawUrl = resource.url || resource.downloadUrl || '';
     if (!rawUrl) return;
 
@@ -487,10 +489,11 @@ export const ActivityWorkspaceModal = ({
     }
   };
 
-  // Manejar selecciÃƒÂ³n de una actividad desde el listado explorador
+  // Manejar selección de una actividad desde el listado explorador
   const handleSelectActivity = (act) => {
     setCurrentActivity(act);
     setUseGoogleDocsFallback(false);
+    setShowMoodleIframe(false);
     if (act?.links && act.links.length > 0) {
       const firstLink = act.links[0];
       setActiveResource(getEmbedInfo(firstLink.url, firstLink.title));
@@ -802,7 +805,7 @@ export const ActivityWorkspaceModal = ({
       );
     }
 
-    const { type, embedUrl, originalUrl, title, googleViewerUrl, isMoodle, officeSubtype, fileName, fileExt } = activeResource;
+    const { type, embedUrl, originalUrl, title, googleViewerUrl, isMoodle, isUcnl, moodleInfo, officeSubtype, fileName, fileExt } = activeResource;
 
     return (
       <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden relative">
@@ -810,7 +813,9 @@ export const ActivityWorkspaceModal = ({
         <div className="px-4 py-2.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2 flex-shrink-0 text-white">
           <div className="flex items-center space-x-2 truncate flex-1 min-w-0">
             <span className="p-1 rounded bg-blue-500/20 text-blue-300 flex-shrink-0">
-              {type === 'youtube' || type === 'vimeo' || type === 'video_direct' ? (
+              {isMoodle ? (
+                <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
+              ) : type === 'youtube' || type === 'vimeo' || type === 'video_direct' ? (
                 <Video className="w-3.5 h-3.5" />
               ) : type === 'image' ? (
                 <ImageIcon className="w-3.5 h-3.5" />
@@ -820,17 +825,17 @@ export const ActivityWorkspaceModal = ({
                 <FileText className="w-3.5 h-3.5" />
               )}
             </span>
-            <span className="text-xs font-bold truncate text-slate-200" title={fileName || title}>
-              {fileName || title}
+            <span className="text-xs font-bold truncate text-slate-200" title={fileName || title || moodleInfo?.sectionLabel}>
+              {fileName || title || moodleInfo?.sectionLabel || 'Recurso'}
             </span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase font-mono font-bold hidden sm:inline-block">
-              {fileExt || type}
+              {moodleInfo?.sectionTag || fileExt || type}
             </span>
           </div>
 
           <div className="flex items-center space-x-1.5 flex-shrink-0">
             {/* Descarga directa */}
-            {(type === 'office' || type === 'archive' || type === 'pdf' || isMoodle || activeResource?.downloadUrl) && (
+            {(type === 'office' || type === 'archive' || type === 'pdf' || activeResource?.downloadUrl?.match(/\.(docx?|xlsx?|pptx?|pdf|zip|rar)/i)) && (
               <a
                 href={originalUrl}
                 target="_blank"
@@ -866,7 +871,7 @@ export const ActivityWorkspaceModal = ({
             </button>
 
             {/* Alternar con Google Docs Viewer */}
-            {(type === 'pdf' || (!isMoodle && type === 'office') || type === 'web') && (
+            {(type === 'pdf' || (!isMoodle && type === 'office') || (!isMoodle && type === 'web')) && (
               <button
                 onClick={() => setUseGoogleDocsFallback(!useGoogleDocsFallback)}
                 className={`px-2 py-1 text-[10px] font-bold rounded-lg transition border cursor-pointer ${
@@ -1007,7 +1012,7 @@ export const ActivityWorkspaceModal = ({
             </div>
           )}
 
-          {/* Documentos Office y Archivos Institucionales / Moodle */}
+          {/* Documentos Office y Archivos Comprimidos */}
           {(type === 'office' || type === 'archive') && (
             <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 bg-slate-950/90 text-center overflow-y-auto">
               {!isMoodle && useGoogleDocsFallback ? (
@@ -1137,8 +1142,166 @@ export const ActivityWorkspaceModal = ({
             </div>
           )}
 
-          {/* Enlace Web GenÃƒÂ©rico */}
-          {type === 'web' && (
+          {/* Sección Interactiva del Campus Virtual UCNL (Moodle) */}
+          {(type === 'moodle_section' || (isMoodle && type === 'web')) && (
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 sm:p-8 bg-slate-950/95 text-center overflow-y-auto">
+              {showMoodleIframe ? (
+                <div className="w-full h-full flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-800">
+                  <div className="p-2.5 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center space-x-2 truncate">
+                      <GraduationCap className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                      <span className="font-bold text-slate-200 truncate">{title || moodleInfo?.sectionLabel || 'Campus Virtual UCNL'}</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowMoodleIframe(false)}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-bold transition cursor-pointer"
+                      >
+                        Volver a la Tarjeta
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDefaultBrowser(originalUrl)}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>Navegador</span>
+                      </button>
+                    </div>
+                  </div>
+                  <iframe
+                    src={embedUrl}
+                    title={title}
+                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"
+                    className="w-full flex-1 border-0 bg-white"
+                  />
+                </div>
+              ) : (
+                <div className="max-w-xl w-full bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-indigo-900/60 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 animate-in fade-in duration-200">
+                  {/* Identidad institucional superior */}
+                  <div className="flex items-center justify-center gap-2 text-xs font-black tracking-widest text-indigo-400 uppercase">
+                    <GraduationCap className="w-4 h-4 text-blue-400" />
+                    <span>Universidad Ciudadana de Nuevo León</span>
+                  </div>
+
+                  {/* Icono de la sección Moodle con resplandor */}
+                  <div className="relative mx-auto w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl">
+                    {moodleInfo?.sectionKey === 'assign' ? (
+                      <div className="w-full h-full rounded-3xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-indigo-500/20">
+                        <FileText className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-indigo-600 text-white shadow uppercase">Tarea</span>
+                      </div>
+                    ) : moodleInfo?.sectionKey === 'quiz' ? (
+                      <div className="w-full h-full rounded-3xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-amber-500/20">
+                        <Clock className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-amber-600 text-white shadow uppercase">Examen</span>
+                      </div>
+                    ) : moodleInfo?.sectionKey === 'forum' ? (
+                      <div className="w-full h-full rounded-3xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-emerald-500/20">
+                        <MessagesSquare className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-600 text-white shadow uppercase">Foro</span>
+                      </div>
+                    ) : moodleInfo?.sectionKey === 'course' ? (
+                      <div className="w-full h-full rounded-3xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-blue-500/20">
+                        <BookOpen className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-blue-600 text-white shadow uppercase">Materia</span>
+                      </div>
+                    ) : moodleInfo?.sectionKey === 'calendar' ? (
+                      <div className="w-full h-full rounded-3xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-sky-500/20">
+                        <Calendar className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-sky-600 text-white shadow uppercase">Agenda</span>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full rounded-3xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shadow-blue-500/20">
+                        <Globe className="w-10 h-10" />
+                        <span className="absolute -bottom-2 px-2.5 py-0.5 rounded-full text-[9px] font-black bg-blue-600 text-white shadow uppercase">Campus</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Título y metadatos */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-center gap-1.5">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-blue-950 text-blue-300 border border-blue-800">
+                        {moodleInfo?.sectionTag || 'Campus Virtual'}
+                      </span>
+                      {moodleInfo?.moodleId && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                          ID: {moodleInfo.moodleId}
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                        licenciatura.ucnl.edu.mx
+                      </span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-black text-white leading-snug break-words">
+                      {title || moodleInfo?.sectionLabel || 'Campus Virtual UCNL'}
+                    </h3>
+                    <p className="text-xs text-slate-400 font-mono truncate max-w-md mx-auto" title={originalUrl}>
+                      {originalUrl}
+                    </p>
+                  </div>
+
+                  {/* Tarjeta de información y tip contextual */}
+                  <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700 text-left space-y-2 text-xs text-slate-300">
+                    <div className="flex items-center gap-2 text-blue-300 font-bold">
+                      <Info className="w-4 h-4 flex-shrink-0" />
+                      <span>Acceso con sesión activa de estudiante</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      {moodleInfo?.sectionTip || 'Para interactuar, entregar actividades o consultar contenidos protegidos, abre la sección en el navegador o en la ventana paralela con tu sesión institucional.'}
+                    </p>
+                  </div>
+
+                  {/* Botones de acción principales */}
+                  <div className="flex flex-col sm:flex-row items-stretch justify-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDefaultBrowser(originalUrl)}
+                      className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+                    >
+                      <Compass className="w-4 h-4" />
+                      <span>{moodleInfo?.actionText || 'Abrir en Campus Virtual'}</span>
+                      <ExternalLink className="w-3.5 h-3.5 ml-0.5 opacity-80" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPopout(originalUrl)}
+                      className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer active:scale-95"
+                      title="Abrir en ventana emergente paralela para trabajar al lado"
+                    >
+                      <AppWindow className="w-4 h-4 text-indigo-400" />
+                      <span>Ventana Paralela</span>
+                    </button>
+                  </div>
+
+                  {/* Acciones secundarias */}
+                  <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-center gap-3 text-[11px] text-slate-400">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyLink(originalUrl)}
+                      className="hover:text-white flex items-center gap-1 cursor-pointer transition"
+                    >
+                      {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedLink ? 'Copiado al portapapeles' : 'Copiar enlace'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMoodleIframe(true)}
+                      className="hover:text-blue-300 flex items-center gap-1 cursor-pointer transition text-slate-400"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Intentar Visor en Línea</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Enlace Web Genérico (No Moodle) */}
+          {type === 'web' && !isMoodle && (
             <div className="w-full h-full flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 relative">
               <div className="p-2.5 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center space-x-2 truncate">
@@ -1147,6 +1310,7 @@ export const ActivityWorkspaceModal = ({
                 </div>
                 <div className="flex items-center space-x-1.5 flex-shrink-0">
                   <button
+                    type="button"
                     onClick={() => handleOpenDefaultBrowser(originalUrl)}
                     className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center space-x-1 transition cursor-pointer"
                   >
@@ -1154,6 +1318,7 @@ export const ActivityWorkspaceModal = ({
                     <ExternalLink className="w-3 h-3" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleOpenPopout(originalUrl)}
                     className="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg font-bold text-xs flex items-center space-x-1 transition cursor-pointer"
                   >
