@@ -200,7 +200,19 @@ export const ActivityFilters = ({
             </div>
           </div>
 
-          {/* 3. Botón Hamburguesa / Menú y Controles Integrados */}
+          {/* 3. Botón Configuración Móvil */}
+          {onOpenConfigModal && (
+            <button
+              type="button"
+              onClick={onOpenConfigModal}
+              title="Configuración y Ajustes"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition shadow-xs flex-shrink-0 active:scale-95 cursor-pointer"
+            >
+              <Settings className={`w-4 h-4 ${isAdmin ? 'text-indigo-600' : 'text-slate-600'}`} />
+            </button>
+          )}
+
+          {/* 4. Botón Hamburguesa / Menú y Controles Integrados */}
           <button
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             title="Abrir menú principal, controles y filtros"
@@ -649,14 +661,15 @@ export const ActivityFilters = ({
           </button>
         </div>
 
-        {/* Botón Configuración sin etiqueta (Solo Docente y Admin, a la derecha del selector de vista) */}
-        {isEditor && onOpenConfigModal && (
+        {/* Botón Configuración sin etiqueta (A la derecha del selector de vista) */}
+        {onOpenConfigModal && (
           <button
+            type="button"
             onClick={onOpenConfigModal}
-            title={isAdmin ? "Configuración y Administración de Usuarios" : "Configuración de Tetramestres y Materias"}
-            className="p-2 rounded-xl text-slate-700 hover:text-slate-900 bg-white/95 hover:bg-white border border-slate-300/90 shadow-xs transition active:scale-95 flex-shrink-0"
+            title={isAdmin ? "Configuración y Administración de Usuarios" : "Configuración y Ajustes"}
+            className="p-2 rounded-xl text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 shadow-xs transition active:scale-95 flex-shrink-0 cursor-pointer"
           >
-            <Settings className={`w-3.5 h-3.5 ${isAdmin ? 'text-indigo-600' : 'text-slate-600'}`} />
+            <Settings className={`w-4 h-4 ${isAdmin ? 'text-indigo-600' : 'text-slate-600'}`} />
           </button>
         )}
 
