@@ -228,8 +228,6 @@ export const ActivityWorkspaceModal = ({
   // Seleccionar recurso para el visor integrado con persistencia de último documento abierto
   const handleSelectResource = useCallback((resource) => {
     if (!resource) return;
-    setUseGoogleDocsFallback(false);
-    setShowMoodleIframe(false);
     const rawUrl = resource.url || resource.downloadUrl || '';
     if (!rawUrl) return;
 

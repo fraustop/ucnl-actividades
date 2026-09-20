@@ -40,7 +40,7 @@ import { useAuth } from '../context/AuthContext';
 import FileIcon from './FileIcon';
 import RichTextRenderer from './RichTextRenderer';
 import RichTextEditor from './RichTextEditor';
-import { formatBytes } from '../services/storageService';
+import { formatBytes, fixCloudinaryUrl } from '../services/storageService';
 import { getEmbedInfo } from '../services/activityWorkspaceService';
 import { 
   subscribeToSubjectResources, 
@@ -170,24 +170,29 @@ export const SubjectResourcesModal = ({
 
   // Seleccionar recurso para el visor integrado
   const handleSelectResource = (resource) => {
-    if (!resource || !resource.url) return;
-    const info = getEmbedInfo(resource.url, resource.title || resource.name);
+    if (!resource) return;
+    const rawUrl = resource.url || resource.downloadUrl || '';
+    if (!rawUrl) return;
+    const correctedUrl = fixCloudinaryUrl(rawUrl, resource.category || resource.type || '');
+    const title = resource.title || resource.name || 'Documento';
+    const info = getEmbedInfo(correctedUrl, title);
     
     // Configurar fallback para Office y PDF
     let googleViewerUrl = null;
     if (info.type === 'office' || info.type === 'pdf' || info.type === 'web') {
-      googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(resource.url)}&embedded=true`;
+      googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(correctedUrl)}&embedded=true`;
     }
 
     setActiveResource({
       ...info,
-      title: resource.title || resource.name || info.title,
-      originalUrl: resource.url,
+      title: title,
+      name: resource.name || title,
+      category: resource.category || info.type,
+      originalUrl: correctedUrl,
+      downloadUrl: correctedUrl,
+      url: correctedUrl,
       googleViewerUrl: googleViewerUrl
     });
-
-    setUseGoogleDocsFallback(false);
-    setShowMoodleIframe(false);
   };
 
   // Abrir en el navegador predeterminado

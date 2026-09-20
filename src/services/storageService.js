@@ -19,17 +19,17 @@ export const formatBytes = (bytes, decimals = 2) => {
  * Detecta la categoría del archivo según extensión o tipo MIME
  */
 export const getFileCategory = (fileName = '', mimeType = '') => {
-  const ext = fileName.split('.').pop().toLowerCase();
+  const ext = (fileName || '').split('.').pop().toLowerCase();
   
   if (['pdf'].includes(ext) || mimeType.includes('pdf')) return 'pdf';
   if (['doc', 'docx', 'odt', 'rtf'].includes(ext) || mimeType.includes('word')) return 'word';
   if (['xls', 'xlsx', 'csv', 'ods'].includes(ext) || mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'excel';
   if (['ppt', 'pptx', 'odp'].includes(ext) || mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'powerpoint';
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext) || mimeType.startsWith('image/')) return 'image';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif'].includes(ext) || (mimeType && mimeType.startsWith('image/'))) return 'image';
   if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext) || mimeType.includes('zip') || mimeType.includes('compressed')) return 'archive';
-  if (['js', 'jsx', 'ts', 'tsx', 'py', 'java', 'c', 'cpp', 'html', 'css', 'sql'].includes(ext)) return 'code';
-  if (['mp3', 'wav', 'ogg'].includes(ext) || mimeType.startsWith('audio/')) return 'audio';
-  if (['mp4', 'mkv', 'avi', 'mov'].includes(ext) || mimeType.startsWith('video/')) return 'video';
+  if (['js', 'jsx', 'ts', 'tsx', 'py', 'java', 'c', 'cpp', 'html', 'css', 'sql', 'json'].includes(ext)) return 'code';
+  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext) || (mimeType && mimeType.startsWith('audio/'))) return 'audio';
+  if (['mp4', 'mkv', 'avi', 'mov', 'webm'].includes(ext) || (mimeType && mimeType.startsWith('video/'))) return 'video';
   
   return 'document';
 };
@@ -89,7 +89,7 @@ export const uploadAttachment = (file, activityFolderId = 'general', onProgress 
             type: file.type || response.format || 'application/octet-stream',
             category,
             storagePath: response.public_id,
-            resourceType: response.resource_type || 'auto',
+            resourceType: response.resource_type || (category === 'image' ? 'image' : category === 'video' ? 'video' : 'raw'),
             downloadUrl: fixCloudinaryUrl(rawDownloadUrl, category),
             provider: 'cloudinary',
             uploadedAt: new Date().toISOString()
@@ -120,16 +120,33 @@ export const uploadAttachment = (file, activityFolderId = 'general', onProgress 
 };
 
 /**
- * Corrects a Cloudinary URL that was saved with the wrong resource_type.
- * Cloudinary /image/upload/ blocks non-image files (PDFs, docs, etc.) with 401.
- * For those files, we swap to /raw/upload/ which allows direct download/view.
+ * Corrige URLs de Cloudinary según el tipo de recurso para evitar errores 401 y 404.
+ * - Imágenes (.jpg, .jpeg, .png, .webp, etc.): Cloudinary requiere /image/upload/
+ * - Videos (.mp4, .webm, .mov, etc.): Cloudinary requiere /video/upload/
+ * - Documentos y archivos (PDF, Word, Excel, PPT, ZIP, etc.): Cloudinary requiere /raw/upload/
  */
 export const fixCloudinaryUrl = (url = '', category = '') => {
-  if (!url || !url.includes('cloudinary.com')) return url;
-  const imageCategories = ['image'];
-  if (imageCategories.includes(category)) return url; // images stay as /image/upload/
-  // For pdf, word, excel, powerpoint, video, audio, code, archive, document → use /raw/upload/
-  return url.replace('/image/upload/', '/raw/upload/');
+  if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) return url;
+  
+  // Extraer extensión de la URL si no viene categoría explícita
+  let detectedCategory = category;
+  if (!detectedCategory || detectedCategory === 'document' || detectedCategory === 'raw' || detectedCategory === 'auto') {
+    const cleanUrl = url.split('?')[0].split('#')[0];
+    detectedCategory = getFileCategory(cleanUrl);
+  }
+
+  // 1. Imágenes: Cloudinary requiere /image/upload/
+  if (detectedCategory === 'image' || /\.(jpe?g|png|gif|webp|svg|bmp|ico|avif)($|\?|#)/i.test(url)) {
+    return url.replace(/\/raw\/upload\//, '/image/upload/').replace(/\/video\/upload\//, '/image/upload/');
+  }
+
+  // 2. Videos: Cloudinary requiere /video/upload/
+  if (detectedCategory === 'video' || /\.(mp4|webm|mov|mkv|avi|m4v)($|\?|#)/i.test(url)) {
+    return url.replace(/\/raw\/upload\//, '/video/upload/').replace(/\/image\/upload\//, '/video/upload/');
+  }
+
+  // 3. Documentos (PDF, Word, Excel, PPT, ZIP, etc.): Cloudinary requiere /raw/upload/
+  return url.replace(/\/image\/upload\//, '/raw/upload/').replace(/\/video\/upload\//, '/raw/upload/');
 };
 
 /**

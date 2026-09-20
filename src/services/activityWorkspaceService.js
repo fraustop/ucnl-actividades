@@ -12,7 +12,7 @@ import {
 } from 'firebase/firestore';
 import { ref as rtdbRef, update as rtdbUpdate } from 'firebase/database';
 import { db, rtdb } from './firebase';
-import { uploadAttachment } from './storageService';
+import { uploadAttachment, fixCloudinaryUrl } from './storageService';
 import { 
   STORES, 
   getAllFromStore, 
@@ -32,7 +32,8 @@ export const getEmbedInfo = (url = '', title = '') => {
     return { type: 'unknown', originalUrl: '', embedUrl: null, title: 'Recurso no disponible' };
   }
 
-  const cleanUrl = url.trim();
+  let cleanUrl = url.trim();
+  cleanUrl = fixCloudinaryUrl(cleanUrl);
   const lowerUrl = cleanUrl.toLowerCase();
 
   // Extraer nombre de archivo si viene en la URL
@@ -298,8 +299,8 @@ export const getEmbedInfo = (url = '', title = '') => {
     };
   }
 
-  // 7. Imágenes directas (PNG, JPG, JPEG, GIF, WebP, SVG)
-  if (/\.(png|jpe?g|gif|webp|svg)($|\?)/i.test(lowerUrl)) {
+  // 7. Imágenes directas (PNG, JPG, JPEG, GIF, WebP, SVG, BMP, ICO, AVIF)
+  if (/\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)($|\?|#)/i.test(lowerUrl) || (lowerUrl.includes('cloudinary.com') && lowerUrl.includes('/image/upload/'))) {
     return {
       type: 'image',
       platform: 'Imagen',
