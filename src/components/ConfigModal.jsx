@@ -13,6 +13,7 @@ import {
   Loader2,
   GraduationCap,
   Users,
+  User,
   UserPlus,
   Shield,
   ShieldAlert,
@@ -28,7 +29,15 @@ import {
   Sparkles,
   Send,
   LayoutGrid,
-  List
+  List,
+  Smartphone,
+  Monitor,
+  Laptop,
+  Tablet,
+  Globe,
+  Wifi,
+  Info,
+  ChevronRight
 } from 'lucide-react';
 import { 
   createAppUser, 
@@ -45,6 +54,7 @@ import {
   DEFAULT_NOTIFICATION_CONFIG,
   areNotificationsSupported
 } from '../services/notificationService';
+import { formatConnectionTime, formatFullDate } from '../utils/dateUtils';
 
 export const ConfigModal = ({
   isOpen,
@@ -107,6 +117,7 @@ export const ConfigModal = ({
   const [userActionSuccess, setUserActionSuccess] = useState('');
   const [userActionError, setUserActionError] = useState('');
   const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
+  const [selectedUserForDevices, setSelectedUserForDevices] = useState(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -967,11 +978,17 @@ export const ConfigModal = ({
                         const isSuper = user.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
                         const isCurrent = user.uid === currentUser?.uid;
                         const isDeleting = deletingUserId === (user.uid || user.id);
+                        const deviceList = user.devices ? Object.values(user.devices) : [];
+                        const deviceCount = deviceList.length;
+                        const hasMobile = deviceList.some(d => d.deviceType === 'mobile') || user.lastSeenType === 'mobile';
+                        const hasDesktop = deviceList.some(d => d.deviceType === 'desktop') || user.lastSeenType === 'desktop';
+                        const hasTablet = deviceList.some(d => d.deviceType === 'tablet') || user.lastSeenType === 'tablet';
+                        const lastConnection = user.lastSeenAt || user.updatedAt || user.createdAt;
 
                         return (
                           <div 
                             key={user.uid || user.id} 
-                            className="bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-3.5 relative group"
+                            className="bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-3 relative group"
                           >
                             <div>
                               {/* Header con Avatar, Nombre, Email y Botón Borrar */}
@@ -1052,10 +1069,41 @@ export const ConfigModal = ({
                                   UID: {(user.uid || user.id || '').substring(0, 8)}...
                                 </span>
                               </div>
+
+                              {/* Conexión y Dispositivos en Tarjeta Grid */}
+                              <div className="mt-2.5 pt-2.5 border-t border-slate-100 space-y-2 text-xs">
+                                <div className="flex items-center justify-between text-slate-600 bg-slate-50/80 px-2.5 py-1.5 rounded-xl border border-slate-100">
+                                  <span className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                    <span>Última conexión:</span>
+                                  </span>
+                                  <span className="text-[11px] font-bold text-slate-800">
+                                    {formatConnectionTime(lastConnection)}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] text-slate-500 font-medium">Dispositivos:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedUserForDevices(user)}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 transition shadow-2xs cursor-pointer active:scale-95"
+                                    title="Ver dispositivos registrados"
+                                  >
+                                    {hasMobile && !hasDesktop && <Smartphone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />}
+                                    {hasDesktop && !hasMobile && <Monitor className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />}
+                                    {hasTablet && <Tablet className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />}
+                                    {((hasMobile && hasDesktop) || (!hasMobile && !hasDesktop && !hasTablet)) && (
+                                      <Smartphone className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                                    )}
+                                    <span>{deviceCount > 0 ? `${deviceCount} ${deviceCount === 1 ? 'dispositivo' : 'dispositivos'}` : (user.lastSeenDevice ? '1 dispositivo' : 'Ver detalle')}</span>
+                                  </button>
+                                </div>
+                              </div>
                             </div>
 
                             {/* Controles de Rol y Estado */}
-                            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
                               <div>
                                 {isSuper ? (
                                   <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -1112,12 +1160,14 @@ export const ConfigModal = ({
                     <table className="w-full text-left text-xs border-collapse">
                       <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold sticky top-0 z-10 shadow-2xs">
                         <tr>
-                          <th className="py-3 px-4 bg-slate-50">Usuario</th>
-                          <th className="py-3 px-4 bg-slate-50">Correo Electrónico</th>
-                          <th className="py-3 px-4 bg-slate-50">Rol Asignado</th>
-                          <th className="py-3 px-4 bg-slate-50">Estado</th>
-                          <th className="py-3 px-4 bg-slate-50">Registrado Por</th>
-                          <th className="py-3 px-4 bg-slate-50 text-right">Acciones</th>
+                          <th className="py-3 px-3.5 bg-slate-50">Usuario</th>
+                          <th className="py-3 px-3 bg-slate-50">Correo Electrónico</th>
+                          <th className="py-3 px-3 bg-slate-50">Rol Asignado</th>
+                          <th className="py-3 px-3 bg-slate-50">Estado</th>
+                          <th className="py-3 px-3 bg-slate-50">Última Conexión</th>
+                          <th className="py-3 px-3 bg-slate-50 text-center">Dispositivos</th>
+                          <th className="py-3 px-3 bg-slate-50">Registrado Por</th>
+                          <th className="py-3 px-3 bg-slate-50 text-right">Acciones</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1125,10 +1175,16 @@ export const ConfigModal = ({
                           const isSuper = user.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
                           const isCurrent = user.uid === currentUser?.uid;
                           const isDeleting = deletingUserId === (user.uid || user.id);
+                          const deviceList = user.devices ? Object.values(user.devices) : [];
+                          const deviceCount = deviceList.length;
+                          const hasMobile = deviceList.some(d => d.deviceType === 'mobile') || user.lastSeenType === 'mobile';
+                          const hasDesktop = deviceList.some(d => d.deviceType === 'desktop') || user.lastSeenType === 'desktop';
+                          const hasTablet = deviceList.some(d => d.deviceType === 'tablet') || user.lastSeenType === 'tablet';
+                          const lastConnection = user.lastSeenAt || user.updatedAt || user.createdAt;
 
                           return (
                             <tr key={user.uid || user.id} className="hover:bg-slate-50/80 transition">
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-3.5">
                                 <div className="flex items-center space-x-3">
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white uppercase shadow-xs flex-shrink-0 ${
                                     user.role === 'admin' 
@@ -1169,11 +1225,11 @@ export const ConfigModal = ({
                                 </div>
                               </td>
 
-                              <td className="py-3 px-4 font-mono text-slate-600 truncate max-w-[200px]">
+                              <td className="py-3 px-3 font-mono text-slate-600 truncate max-w-[180px]">
                                 {user.email}
                               </td>
 
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-3">
                                 {isSuper ? (
                                   <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
                                     <Shield className="w-3 h-3 text-indigo-600" />
@@ -1198,7 +1254,7 @@ export const ConfigModal = ({
                                 )}
                               </td>
 
-                              <td className="py-3 px-4">
+                              <td className="py-3 px-3">
                                 {isSuper ? (
                                   <span className="inline-flex items-center text-emerald-700 font-bold text-[11px]">
                                     <Check className="w-3 h-3 mr-1" /> Activo
@@ -1217,12 +1273,40 @@ export const ConfigModal = ({
                                 )}
                               </td>
 
-                              <td className="py-3 px-4 text-slate-500 text-[11px] truncate max-w-[150px]">
+                              {/* Columna: Última Conexión */}
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <div className="flex items-center space-x-1.5 text-xs">
+                                  <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                  <span className="font-semibold text-slate-700">
+                                    {formatConnectionTime(lastConnection)}
+                                  </span>
+                                </div>
+                              </td>
+
+                              {/* Columna: Dispositivos */}
+                              <td className="py-3 px-3 text-center whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedUserForDevices(user)}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold transition border cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200/80 hover:border-indigo-300 shadow-2xs active:scale-95"
+                                  title="Ver dispositivos de este usuario"
+                                >
+                                  {hasMobile && !hasDesktop && <Smartphone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />}
+                                  {hasDesktop && !hasMobile && <Monitor className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />}
+                                  {hasTablet && <Tablet className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />}
+                                  {((hasMobile && hasDesktop) || (!hasMobile && !hasDesktop && !hasTablet)) && (
+                                    <Smartphone className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                                  )}
+                                  <span>{deviceCount > 0 ? `${deviceCount} ${deviceCount === 1 ? 'disp.' : 'disps.'}` : (user.lastSeenDevice ? '1 disp.' : '0 disps.')}</span>
+                                </button>
+                              </td>
+
+                              <td className="py-3 px-3 text-slate-500 text-[11px] truncate max-w-[120px]">
                                 {user.createdBy || 'Sistema'}
                               </td>
 
                               {/* Columna de Acciones: Botón Borrar */}
-                              <td className="py-3 px-4 text-right">
+                              <td className="py-3 px-3 text-right">
                                 {isSuper || isCurrent ? (
                                   <span 
                                     className="inline-flex p-1.5 text-slate-300 cursor-not-allowed" 
@@ -1781,6 +1865,208 @@ export const ConfigModal = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Emergente de Dispositivos del Usuario */}
+      {selectedUserForDevices && (
+        <div 
+          className="fixed inset-0 z-[600] flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setSelectedUserForDevices(null)}
+        >
+          <div 
+            className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del Modal */}
+            <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-indigo-950 to-blue-950 text-white flex items-center justify-between gap-3 flex-shrink-0">
+              <div className="flex items-center space-x-3 min-w-0">
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm text-white uppercase shadow-md flex-shrink-0 ${
+                  selectedUserForDevices.role === 'admin' 
+                    ? 'bg-gradient-to-tr from-indigo-500 to-purple-600 border border-indigo-400/40' 
+                    : selectedUserForDevices.role === 'estudiante'
+                    ? 'bg-gradient-to-tr from-emerald-500 to-teal-600 border border-emerald-400/40'
+                    : 'bg-gradient-to-tr from-blue-500 to-cyan-600 border border-blue-400/40'
+                }`}>
+                  {selectedUserForDevices.displayName ? selectedUserForDevices.displayName[0] : (selectedUserForDevices.email ? selectedUserForDevices.email[0] : 'U')}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-extrabold text-sm text-white truncate flex items-center gap-1.5">
+                    <span>{selectedUserForDevices.displayName || 'Usuario'}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      selectedUserForDevices.role === 'admin'
+                        ? 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/40'
+                        : selectedUserForDevices.role === 'estudiante'
+                        ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/40'
+                        : 'bg-blue-500/30 text-blue-200 border border-blue-400/40'
+                    }`}>
+                      {selectedUserForDevices.role === 'admin' ? 'Administrador' : selectedUserForDevices.role === 'estudiante' ? 'Estudiante' : 'Docente'}
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-300 truncate font-mono">{selectedUserForDevices.email}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedUserForDevices(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition flex-shrink-0 cursor-pointer"
+                title="Cerrar modal (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 touch-scroll flex-1">
+              {/* Barra de resumen */}
+              <div className="flex items-center justify-between p-3 bg-indigo-50/70 rounded-2xl border border-indigo-100 text-xs">
+                <div className="flex items-center space-x-2">
+                  <Smartphone className="w-4 h-4 text-indigo-600" />
+                  <span className="font-bold text-indigo-900">Dispositivos Vinculados</span>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-600 text-white font-extrabold text-xs">
+                  {selectedUserForDevices.devices ? Object.keys(selectedUserForDevices.devices).length : (selectedUserForDevices.lastSeenDevice ? 1 : 0)}
+                </span>
+              </div>
+
+              {/* Lista de Dispositivos */}
+              {(() => {
+                const rawDevices = selectedUserForDevices.devices ? Object.values(selectedUserForDevices.devices) : [];
+                // Si no hay mapa devices, pero existe lastSeenDevice, construir fallback
+                const devices = rawDevices.length > 0 ? rawDevices : (
+                  selectedUserForDevices.lastSeenDevice ? [{
+                    deviceId: 'legacy',
+                    deviceType: selectedUserForDevices.lastSeenType || 'desktop',
+                    deviceName: selectedUserForDevices.lastSeenDevice,
+                    os: selectedUserForDevices.lastSeenDevice.includes('Windows') ? 'Windows' : selectedUserForDevices.lastSeenDevice.includes('Android') ? 'Android' : (selectedUserForDevices.lastSeenDevice.includes('iOS') || selectedUserForDevices.lastSeenDevice.includes('iPhone')) ? 'iOS' : 'Computadora/PC',
+                    browser: 'Navegador Web',
+                    isPWA: false,
+                    lastSeen: selectedUserForDevices.lastSeenAt || selectedUserForDevices.updatedAt || selectedUserForDevices.createdAt
+                  }] : []
+                );
+
+                if (devices.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-2xl space-y-2">
+                      <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                        <Smartphone className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-slate-700 text-sm">Sin dispositivos registrados aún</p>
+                      <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                        El tipo de dispositivo (celular o computadora), sistema operativo y navegador se registrarán de forma automática en cuanto el usuario inicie sesión en la plataforma.
+                      </p>
+                    </div>
+                  );
+                }
+
+                // Ordenar por última conexión más reciente
+                const sorted = [...devices].sort((a, b) => new Date(b.lastSeen || 0) - new Date(a.lastSeen || 0));
+
+                return (
+                  <div className="space-y-3">
+                    {sorted.map((dev, idx) => {
+                      const isMobile = dev.deviceType === 'mobile';
+                      const isTablet = dev.deviceType === 'tablet';
+                      const isDesktop = dev.deviceType === 'desktop' || (!isMobile && !isTablet);
+
+                      return (
+                        <div
+                          key={dev.deviceId || idx}
+                          className="p-4 bg-slate-50 hover:bg-slate-50/80 border border-slate-200 rounded-2xl transition space-y-3 shadow-2xs"
+                        >
+                          {/* Fila Superior: Icono, Nombre del dispositivo y Badges */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center space-x-3 min-w-0">
+                              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                                isMobile 
+                                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+                                  : isTablet
+                                  ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                  : 'bg-blue-100 text-blue-700 border border-blue-200'
+                              }`}>
+                                {isMobile && <Smartphone className="w-5 h-5" />}
+                                {isTablet && <Tablet className="w-5 h-5" />}
+                                {isDesktop && <Monitor className="w-5 h-5" />}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-xs text-slate-800 truncate">
+                                  {dev.deviceName || (isMobile ? 'Celular / Smartphone' : 'Computadora / Desktop')}
+                                </h4>
+                                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                    isMobile
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                      : isTablet
+                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  }`}>
+                                    {isMobile ? '📱 Celular / Smartphone' : isTablet ? '📟 Tablet' : '💻 Computadora / Desktop'}
+                                  </span>
+                                  {dev.isPWA ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                      <Sparkles className="w-3 h-3 text-purple-600" />
+                                      <span>PWA Instalada</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200/70 text-slate-600 flex items-center gap-1">
+                                      <Globe className="w-3 h-3 text-slate-500" />
+                                      <span>Web</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Fila Inferior: Detalles técnicos y Fecha de Última Conexión */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-xs">
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                Sistema & Navegador
+                              </span>
+                              <p className="text-[11px] font-medium text-slate-700">
+                                {dev.os || 'SO Desconocido'} • {dev.browser || 'Navegador'}
+                              </p>
+                            </div>
+
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                Última Conexión
+                              </span>
+                              <p className="text-[11px] font-bold text-indigo-900 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-indigo-500" />
+                                <span>{dev.lastSeen ? formatFullDate(dev.lastSeen) : 'Fecha no registrada'}</span>
+                              </p>
+                              {dev.lastSeen && (
+                                <span className="text-[10px] text-slate-400 block">
+                                  ({formatConnectionTime(dev.lastSeen)})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+              <span className="text-[11px] text-slate-500">
+                Los dispositivos se registran en tiempo real en Firestore.
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedUserForDevices(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

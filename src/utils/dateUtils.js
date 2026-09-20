@@ -21,6 +21,27 @@ export const formatShortDate = (dateString) => {
   }
 };
 
+export const formatConnectionTime = (dateString) => {
+  if (!dateString) return 'Sin conexión registrada';
+  try {
+    const date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
+    if (isToday(date)) {
+      return `Hoy, ${format(date, 'HH:mm')}`;
+    }
+    const now = new Date();
+    const daysAgo = differenceInDays(now, date);
+    if (daysAgo === 1) {
+      return `Ayer, ${format(date, 'HH:mm')}`;
+    }
+    if (daysAgo < 7) {
+      return format(date, "EEEE, HH:mm", { locale: es });
+    }
+    return format(date, "d MMM yyyy, HH:mm", { locale: es });
+  } catch (e) {
+    return dateString;
+  }
+};
+
 export const getDueBadgeInfo = (dateString, isCompleted = false) => {
   return getDueProgressInfo(dateString, isCompleted);
 };

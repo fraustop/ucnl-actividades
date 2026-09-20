@@ -39,6 +39,105 @@ const getSecondaryAuth = () => {
 };
 
 /**
+ * Obtiene o genera un identificador persistente y único para este dispositivo
+ */
+export const getDeviceId = () => {
+  if (typeof window === 'undefined') return 'unknown_device';
+  let deviceId = localStorage.getItem('ucnl_device_id');
+  if (!deviceId) {
+    deviceId = 'dev_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').slice(0, 12) : Math.random().toString(36).slice(2, 14));
+    localStorage.setItem('ucnl_device_id', deviceId);
+  }
+  return deviceId;
+};
+
+/**
+ * Detecta las especificaciones del dispositivo actual (Tipo, SO, Navegador, PWA)
+ */
+export const detectCurrentDeviceInfo = () => {
+  if (typeof window === 'undefined') {
+    return {
+      deviceId: 'server',
+      deviceType: 'desktop',
+      os: 'Unknown',
+      browser: 'Unknown',
+      deviceName: 'Servidor',
+      isPWA: false,
+      lastSeen: new Date().toISOString()
+    };
+  }
+
+  const ua = navigator.userAgent || '';
+  const deviceId = getDeviceId();
+
+  // 1. Tipo de dispositivo (mobile vs desktop vs tablet)
+  const isTablet = /(ipad|tablet|(android(?!.*mobile))|(windows(?!.*phone)(.*touch))|kindle|playbook|silk)/i.test(ua);
+  const isMobile = !isTablet && /Mobile|iPhone|Android|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const deviceType = isTablet ? 'tablet' : isMobile ? 'mobile' : 'desktop';
+
+  // 2. Sistema Operativo
+  let os = 'Desconocido';
+  if (/Windows NT 10.0|Windows NT 11.0/i.test(ua)) os = 'Windows';
+  else if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/iPhone/i.test(ua)) os = 'iOS (iPhone)';
+  else if (/iPad/i.test(ua)) os = 'iPadOS';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/Mac OS X/i.test(ua)) os = 'macOS';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+  else if (/CrOS/i.test(ua)) os = 'ChromeOS';
+
+  // 3. Navegador
+  let browser = 'Navegador Web';
+  if (/Edg\//i.test(ua)) browser = 'Microsoft Edge';
+  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
+  else if (/Chrome\//i.test(ua)) browser = 'Google Chrome';
+  else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/Firefox\//i.test(ua)) browser = 'Mozilla Firefox';
+
+  // 4. Es PWA instalada
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches || !!window.navigator.standalone;
+
+  // 5. Nombre amigable
+  const typeLabel = deviceType === 'mobile' ? 'Celular' : deviceType === 'tablet' ? 'Tablet' : 'Computadora';
+  const appLabel = isPWA ? ' (App PWA)' : '';
+  const deviceName = `${browser} en ${os}${appLabel}`;
+
+  return {
+    deviceId,
+    deviceType,
+    os,
+    browser,
+    deviceName,
+    typeLabel,
+    isPWA,
+    userAgent: ua.slice(0, 200),
+    lastSeen: new Date().toISOString()
+  };
+};
+
+/**
+ * Registra o actualiza el dispositivo actual y la última conexión del usuario en Firestore
+ */
+export const recordUserDeviceAndConnection = async (user) => {
+  if (!user || !user.uid) return;
+
+  try {
+    const deviceInfo = detectCurrentDeviceInfo();
+    const timestamp = new Date().toISOString();
+    const userRef = doc(db, 'users', user.uid);
+
+    await setDoc(userRef, {
+      lastSeenAt: timestamp,
+      lastSeenDevice: deviceInfo.deviceName,
+      lastSeenType: deviceInfo.deviceType,
+      [`devices.${deviceInfo.deviceId}`]: deviceInfo
+    }, { merge: true });
+  } catch (err) {
+    console.warn('No se pudo registrar dispositivo/conexión:', err.message);
+  }
+};
+
+/**
  * Garantiza que el usuario tenga un documento de perfil en Firestore
  */
 export const ensureAdminProfile = async (user, requestedRole = 'estudiante') => {
@@ -47,10 +146,14 @@ export const ensureAdminProfile = async (user, requestedRole = 'estudiante') => 
   const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
   const userRef = doc(db, 'users', user.uid);
   
+  // Registrar automáticamente dispositivo y última conexión
+  recordUserDeviceAndConnection(user).catch(() => {});
+
   try {
     const userDoc = await getDoc(userRef);
 
     if (!userDoc.exists()) {
+      const deviceInfo = detectCurrentDeviceInfo();
       const initialProfile = {
         uid: user.uid,
         email: user.email,
@@ -59,6 +162,12 @@ export const ensureAdminProfile = async (user, requestedRole = 'estudiante') => 
         role: isSuperAdmin ? 'admin' : (requestedRole || 'estudiante'),
         status: 'active',
         authProvider: user.providerData?.[0]?.providerId || 'password',
+        lastSeenAt: new Date().toISOString(),
+        lastSeenDevice: deviceInfo.deviceName,
+        lastSeenType: deviceInfo.deviceType,
+        devices: {
+          [deviceInfo.deviceId]: deviceInfo
+        },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
