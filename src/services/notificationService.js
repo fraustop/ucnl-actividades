@@ -250,20 +250,25 @@ export const checkAndTriggerLocalDueReminders = async (
   // Registrar fecha de la última comprobación diaria
   localStorage.setItem(LOCAL_STORAGE_DUE_CHECK_KEY, todayStr);
 
-  // Si son 1 o 2 actividades, mostrar notificación detallada para cada una
-  if (dueAlerts.length <= 2) {
-    for (const alert of dueAlerts) {
-      await emitLocalNotification(alert.title, {
-        body: alert.body,
-        tag: `due_${alert.act.id}`,
-        data: { activityId: alert.act.id, url: '/' }
-      });
-    }
+  // Si es exactamente 1 actividad, mostrar recordatorio directo y conciso
+  if (dueAlerts.length === 1) {
+    const alert = dueAlerts[0];
+    await emitLocalNotification(alert.title, {
+      body: alert.body,
+      tag: `due_${todayStr}_${alert.act.id}`,
+      data: { activityId: alert.act.id, url: '/' }
+    });
   } else {
-    // Si son 3 o más, mostrar un resumen consolidado para evitar saturar la pantalla
-    await emitLocalNotification('🔔 Recordatorios de Entregas UCNL', {
-      body: `Tienes ${dueAlerts.length} actividades escolares próximas a vencer. ¡Revisa tu tablero!`,
-      tag: 'due_summary',
+    // Si son 2 o más, emitir UN SOLO resumen consolidado para evitar spam
+    const urgentCount = dueAlerts.filter(a => a.type === 'urgent').length;
+    let summaryBody = `Tienes ${dueAlerts.length} actividades escolares con entrega esta semana.`;
+    if (urgentCount > 0) {
+      summaryBody = `Tienes ${urgentCount} entrega(s) urgente(s) y ${dueAlerts.length} tareas pendientes esta semana.`;
+    }
+
+    await emitLocalNotification('📋 Resumen de Entregas UCNL', {
+      body: summaryBody,
+      tag: `due_summary_${todayStr}`,
       data: { url: '/' }
     });
   }
