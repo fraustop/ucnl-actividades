@@ -62,6 +62,7 @@ export const uploadAttachment = (file, activityFolderId = 'general', onProgress 
     formData.append('file', file);
     formData.append('upload_preset', uploadPreset);
     formData.append('folder', `ucnl_activities/${activityFolderId || 'general'}`);
+    formData.append('access_mode', 'public'); // forzar acceso público al recurso
 
 
     const xhr = new XMLHttpRequest();
