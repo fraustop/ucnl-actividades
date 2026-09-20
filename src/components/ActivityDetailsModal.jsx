@@ -17,7 +17,8 @@ import {
   Video,
   MessagesSquare,
   MessageCircle,
-  GraduationCap
+  GraduationCap,
+  FolderOpen
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ACTIVITY_STATUSES, ACTIVITY_TYPES } from '../types/constants';
@@ -34,6 +35,7 @@ export const ActivityDetailsModal = ({
   onClose,
   onEdit,
   onDelete,
+  onOpenWorkspace,
   isStudent = false,
   personalStatus = 'pending',
   onSetPersonalStatus,
@@ -101,13 +103,26 @@ export const ActivityDetailsModal = ({
             </span>
           </div>
 
-          <button
-            onClick={handleShare}
-            className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-200/70 transition"
-            title="Compartir"
-          >
-            <Share2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {onOpenWorkspace && (
+              <button
+                onClick={() => onOpenWorkspace(activity)}
+                className="px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 active:bg-blue-300 rounded-xl transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                title="Abrir Recursos y Espacio de Trabajo"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-blue-600" />
+                <span>Recursos</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleShare}
+              className="p-2 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-200/70 transition"
+              title="Compartir"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Título y Metadatos Móvil */}
@@ -344,7 +359,17 @@ export const ActivityDetailsModal = ({
               </span>
             </div>
 
-            <div className="flex items-center space-x-1 flex-shrink-0">
+            <div className="flex items-center space-x-1.5 flex-shrink-0">
+              {onOpenWorkspace && (
+                <button
+                  onClick={() => onOpenWorkspace(activity)}
+                  title="Abrir Recursos y Visor Integrado"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 active:bg-blue-200 rounded-xl transition shadow-2xs hover:shadow-xs cursor-pointer"
+                >
+                  <FolderOpen className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Recursos</span>
+                </button>
+              )}
               <button
                 onClick={handleShare}
                 title="Compartir actividad"

@@ -51,6 +51,7 @@ import AuthModal from './components/AuthModal';
 import AuthScreen from './components/AuthScreen';
 import ActivityModal from './components/ActivityModal';
 import ActivityDetailsModal from './components/ActivityDetailsModal';
+import ActivityWorkspaceModal from './components/ActivityWorkspaceModal';
 import ActivityFilters from './components/ActivityFilters';
 import ConfigModal from './components/ConfigModal';
 import ResourcesModal from './components/ResourcesModal';
@@ -91,6 +92,8 @@ export function App() {
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedActivityId, setSelectedActivityId] = useState(initialNav.activityId || null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(initialNav.modal === 'activity_details');
+  const [workspaceModalOpen, setWorkspaceModalOpen] = useState(initialNav.modal === 'workspace');
+  const [workspaceActivity, setWorkspaceActivity] = useState(null);
   const [configModalOpen, setConfigModalOpen] = useState(initialNav.modal === 'config');
   const [configModalTab, setConfigModalTab] = useState(initialNav.configTab || 'tetras');
   const [resourcesModalOpen, setResourcesModalOpen] = useState(initialNav.modal === 'resources');
@@ -276,7 +279,12 @@ export function App() {
       const found = activities.find(a => a.id === selectedActivityId);
       if (found) {
         setSelectedActivity(found);
-        setDetailsModalOpen(true);
+        if (initialNav.modal === 'workspace') {
+          setWorkspaceActivity(found);
+          setWorkspaceModalOpen(true);
+        } else {
+          setDetailsModalOpen(true);
+        }
       }
     }
   }, [activities, selectedActivityId, selectedActivity]);
@@ -290,13 +298,17 @@ export function App() {
       selectedStatus: override.selectedStatus !== undefined ? override.selectedStatus : selectedStatus,
       searchQuery: override.searchQuery !== undefined ? override.searchQuery : searchQuery,
       modal: override.modal !== undefined ? override.modal : (
+        workspaceModalOpen ? 'workspace' :
         configModalOpen ? 'config' :
         resourcesModalOpen ? 'resources' :
         notificationDrawerOpen ? 'notifications' :
         activityModalOpen ? 'new_activity' :
         detailsModalOpen ? 'activity_details' : null
       ),
-      activityId: override.activityId !== undefined ? override.activityId : (detailsModalOpen ? (selectedActivity?.id || selectedActivityId) : null),
+      activityId: override.activityId !== undefined ? override.activityId : (
+        workspaceModalOpen ? (workspaceActivity?.id || selectedActivity?.id || selectedActivityId) :
+        detailsModalOpen ? (selectedActivity?.id || selectedActivityId) : null
+      ),
       configTab: override.configTab !== undefined ? override.configTab : configModalTab
     };
 
@@ -321,29 +333,47 @@ export function App() {
         setNotificationDrawerOpen(false);
         setActivityModalOpen(false);
         setDetailsModalOpen(false);
+        setWorkspaceModalOpen(false);
       } else if (nav.modal === 'resources') {
         setResourcesModalOpen(true);
         setConfigModalOpen(false);
         setNotificationDrawerOpen(false);
         setActivityModalOpen(false);
         setDetailsModalOpen(false);
+        setWorkspaceModalOpen(false);
       } else if (nav.modal === 'notifications') {
         setNotificationDrawerOpen(true);
         setConfigModalOpen(false);
         setResourcesModalOpen(false);
         setActivityModalOpen(false);
         setDetailsModalOpen(false);
+        setWorkspaceModalOpen(false);
       } else if (nav.modal === 'new_activity') {
         setActivityModalOpen(true);
         setConfigModalOpen(false);
         setResourcesModalOpen(false);
         setNotificationDrawerOpen(false);
         setDetailsModalOpen(false);
+        setWorkspaceModalOpen(false);
+      } else if (nav.modal === 'workspace' && nav.activityId) {
+        setSelectedActivityId(nav.activityId);
+        const found = activities.find(a => a.id === nav.activityId);
+        if (found) {
+          setSelectedActivity(found);
+          setWorkspaceActivity(found);
+        }
+        setWorkspaceModalOpen(true);
+        setDetailsModalOpen(false);
+        setConfigModalOpen(false);
+        setResourcesModalOpen(false);
+        setNotificationDrawerOpen(false);
+        setActivityModalOpen(false);
       } else if (nav.modal === 'activity_details' && nav.activityId) {
         setSelectedActivityId(nav.activityId);
         const found = activities.find(a => a.id === nav.activityId);
         if (found) setSelectedActivity(found);
         setDetailsModalOpen(true);
+        setWorkspaceModalOpen(false);
         setConfigModalOpen(false);
         setResourcesModalOpen(false);
         setNotificationDrawerOpen(false);
@@ -354,8 +384,10 @@ export function App() {
         setNotificationDrawerOpen(false);
         setActivityModalOpen(false);
         setDetailsModalOpen(false);
+        setWorkspaceModalOpen(false);
         setSelectedActivity(null);
         setSelectedActivityId(null);
+        setWorkspaceActivity(null);
       }
 
       saveNavigationState(nav, false);
@@ -475,6 +507,23 @@ export function App() {
   const handleCloseNotificationDrawer = () => {
     setNotificationDrawerOpen(false);
     syncNav({ modal: null }, true);
+  };
+
+  const handleOpenWorkspace = (activity) => {
+    const act = activity || selectedActivity;
+    if (!act) return;
+    setWorkspaceActivity(act);
+    setWorkspaceModalOpen(true);
+    syncNav({ modal: 'workspace', activityId: act.id }, true);
+  };
+
+  const handleCloseWorkspace = () => {
+    setWorkspaceModalOpen(false);
+    if (detailsModalOpen && selectedActivity) {
+      syncNav({ modal: 'activity_details', activityId: selectedActivity.id }, true);
+    } else {
+      syncNav({ modal: null, activityId: null }, true);
+    }
   };
 
   const handleViewModeChange = (mode) => {
@@ -743,6 +792,7 @@ export function App() {
               activity={selectedActivity}
               onEdit={handleEditActivity}
               onDelete={handleDeleteActivity}
+              onOpenWorkspace={handleOpenWorkspace}
               personalStatus={selectedActivity ? (studentCompletions[selectedActivity.id] || 'pending') : 'pending'}
               onSetPersonalStatus={handleSetPersonalStatus}
               onToggleStudentCompletion={handleToggleStudentCompletion}
@@ -750,6 +800,25 @@ export function App() {
           )}
 
         </div>
+      )}
+
+      {/* Modal de Espacio de Trabajo y Recursos (Visor Multiformato + Comentarios + Carga de Documentos + Enlaces/Videos) */}
+      {workspaceModalOpen && (workspaceActivity || selectedActivity) && (
+        <ActivityWorkspaceModal
+          isOpen={workspaceModalOpen}
+          onClose={handleCloseWorkspace}
+          activity={workspaceActivity || selectedActivity}
+          onEditActivity={(act) => {
+            handleCloseWorkspace();
+            handleEditActivity(act);
+          }}
+          personalStatus={
+            (workspaceActivity || selectedActivity)
+              ? (studentCompletions[(workspaceActivity || selectedActivity).id] || 'pending')
+              : 'pending'
+          }
+          onSetPersonalStatus={handleSetPersonalStatus}
+        />
       )}
 
       {/* Modal Crear / Editar Actividad */}

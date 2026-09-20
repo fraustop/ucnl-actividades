@@ -40,6 +40,9 @@ export const navStateToHash = (state) => {
   if (state.modal === 'new_activity') {
     return '#/activity/new';
   }
+  if (state.modal === 'workspace' && state.activityId) {
+    return `#/activity/${encodeURIComponent(state.activityId)}/workspace`;
+  }
   if (state.modal === 'activity_details' && state.activityId) {
     return `#/activity/${encodeURIComponent(state.activityId)}`;
   }
@@ -94,6 +97,9 @@ export const hashToNavState = (hash = '') => {
   if (pathSegments[0] === 'activity') {
     if (pathSegments[1] === 'new') {
       state.modal = 'new_activity';
+    } else if (pathSegments[1] && pathSegments[2] === 'workspace') {
+      state.modal = 'workspace';
+      state.activityId = decodeURIComponent(pathSegments[1]);
     } else if (pathSegments[1]) {
       state.modal = 'activity_details';
       state.activityId = decodeURIComponent(pathSegments[1]);

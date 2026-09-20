@@ -16,7 +16,7 @@ import { normalizeUrl } from '../utils/textUtils';
  * - Tablas (| col1 | col2 |)
  * - Separadores horizontales (---, ***, <hr>)
  */
-export const RichTextRenderer = ({ content = '', className = '' }) => {
+export const RichTextRenderer = ({ content = '', className = '', onLinkClick = null }) => {
   const [copiedIndex, setCopiedIndex] = React.useState(null);
 
   if (!content || typeof content !== 'string') {
@@ -27,6 +27,16 @@ export const RichTextRenderer = ({ content = '', className = '' }) => {
     navigator.clipboard.writeText(codeText);
     setCopiedIndex(idx);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleLinkAction = (e, url, label) => {
+    if (onLinkClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      onLinkClick(url, label);
+    } else {
+      e.stopPropagation();
+    }
   };
 
   // Función para renderizar elementos inline (negritas, cursivas, enlaces, código, etc.)
@@ -63,9 +73,9 @@ export const RichTextRenderer = ({ content = '', className = '' }) => {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2 hover:underline transition mx-0.5 break-all group"
-            onClick={(e) => e.stopPropagation()}
-            title={`Abrir ${url}`}
+            className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2 hover:underline transition mx-0.5 break-all group cursor-pointer"
+            onClick={(e) => handleLinkAction(e, url, label)}
+            title={onLinkClick ? `Cargar en visor integrado: ${url}` : `Abrir ${url}`}
           >
             <span>{label}</span>
             <ExternalLink className="w-3.5 h-3.5 inline-block flex-shrink-0 text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -81,9 +91,9 @@ export const RichTextRenderer = ({ content = '', className = '' }) => {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2 hover:underline transition mx-0.5 break-all group"
-            onClick={(e) => e.stopPropagation()}
-            title={`Abrir ${url}`}
+            className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2 hover:underline transition mx-0.5 break-all group cursor-pointer"
+            onClick={(e) => handleLinkAction(e, url, label)}
+            title={onLinkClick ? `Cargar en visor integrado: ${url}` : `Abrir ${url}`}
           >
             <span>{label}</span>
             <ExternalLink className="w-3.5 h-3.5 inline-block flex-shrink-0 text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -99,9 +109,9 @@ export const RichTextRenderer = ({ content = '', className = '' }) => {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-medium underline underline-offset-2 hover:underline transition mx-0.5 break-all group"
-            onClick={(e) => e.stopPropagation()}
-            title={`Abrir ${url}`}
+            className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-800 font-medium underline underline-offset-2 hover:underline transition mx-0.5 break-all group cursor-pointer"
+            onClick={(e) => handleLinkAction(e, url, rawUrl)}
+            title={onLinkClick ? `Cargar en visor integrado: ${url}` : `Abrir ${url}`}
           >
             <span>{rawUrl}</span>
             <ExternalLink className="w-3.5 h-3.5 inline-block flex-shrink-0 text-blue-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
