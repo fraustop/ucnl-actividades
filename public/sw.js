@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ucnl-actividades-v5';
+const CACHE_NAME = 'ucnl-actividades-v6';
 
 const STATIC_ASSETS = [
   '/',
@@ -45,22 +45,24 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // 1. Ignorar solicitudes a Firebase, Firestore, Cloud Storage, Google APIs y métodos no-GET
+  // 1. Ignorar solicitudes a Firebase, Firestore, Cloud Storage, Google APIs, RTDB y métodos no-GET
   if (
     request.method !== 'GET' ||
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('firebasestorage.googleapis.com') ||
     url.hostname.includes('identitytoolkit.googleapis.com') ||
     url.hostname.includes('firebaseinstallations.googleapis.com') ||
+    url.hostname.includes('firebaseio.com') ||
+    url.hostname.includes('googleapis.com') ||
     url.hostname.includes('google-analytics.com')
   ) {
     return;
   }
 
-  // 2. Navegación HTML (Páginas): Network-First con fallback a Caché (para modo offline)
-  if (request.mode === 'navigate') {
+  // 2. Navegación HTML (Páginas): Network-First con no-cache y fallback a Caché (para modo offline)
+  if (request.mode === 'navigate' || request.destination === 'document') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-cache' })
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const copy = networkResponse.clone();

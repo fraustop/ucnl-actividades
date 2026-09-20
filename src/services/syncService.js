@@ -8,7 +8,9 @@ import {
   collection, 
   addDoc,
   onSnapshot, 
-  deleteField 
+  deleteField,
+  query,
+  orderBy
 } from 'firebase/firestore';
 import { 
   ref as rtdbRef, 
@@ -48,25 +50,24 @@ const broadcastRtdbSignal = async (payload = {}) => {
       ...payload
     });
   } catch (err) {
-    // RTDB es complementario, si está desconectado continúa con Firestore
     console.debug('Aviso RTDB signal:', err.message);
   }
 };
 
 /**
- * Inicializa la sincronización Delta ultra-eficiente con RTDB + Firestore + IndexedDB:
- * 1. Carga inmediata desde IndexedDB local (0 lecturas a Firestore, 0 ms).
- * 2. Comprobación ultraligera por RTDB (pesa ~50 bytes, 0 lecturas a Firestore).
- * 3. Si no hay cambios: 0 lecturas en Firestore.
- * 4. Si hay cambios: Descarga ÚNICAMENTE el documento modificado y lo guarda en IndexedDB.
+ * Inicializa la sincronización directa y robusta con Firestore + IndexedDB:
+ * 1. Carga inmediata desde IndexedDB local (0 ms, inicio instantáneo).
+ * 2. Suscripción en tiempo real a la colección de actividades y estructura en Firestore.
+ * 3. Actualización automática de IndexedDB, Metadata y RTDB.
  */
 export const initSync = (onDataUpdated, onError) => {
   let isUnsubscribed = false;
   let currentStructure = [];
   let currentActivities = [];
-  let unsubFirestoreMeta = null;
+  let unsubActivities = null;
+  let unsubStructure = null;
 
-  // Paso 1: Carga instantánea desde IndexedDB local (0 lecturas)
+  // Paso 1: Carga instantánea desde IndexedDB local (0 ms)
   const loadLocalCache = async () => {
     try {
       const localActivities = await getAllFromStore(STORES.ACTIVITIES);
@@ -75,7 +76,7 @@ export const initSync = (onDataUpdated, onError) => {
       currentStructure = localStructureDoc ? (localStructureDoc.tetras || []) : [];
       currentActivities = localActivities || [];
 
-      if (!isUnsubscribed) {
+      if (!isUnsubscribed && (currentActivities.length > 0 || currentStructure.length > 0)) {
         onDataUpdated({
           activities: currentActivities,
           academicStructure: currentStructure,
@@ -89,173 +90,122 @@ export const initSync = (onDataUpdated, onError) => {
 
   loadLocalCache();
 
-  // Función para procesar metadata y sincronizar delta a IndexedDB
-  const processDeltaSync = async (remoteActivitiesMap, remoteStructureUpdated, remoteLastUpdated) => {
-    try {
-      const localActivities = await getAllFromStore(STORES.ACTIVITIES);
-      const localStructureDoc = await getFromStore(STORES.ACADEMIC_STRUCTURE, LOCAL_STRUCTURE_ID);
-      const localActMap = new Map((localActivities || []).map((a) => [a.id, a]));
+  // Paso 2: Suscripción en tiempo real a la colección de actividades en Firestore
+  try {
+    const q = query(collection(db, 'activities'), orderBy('dueDate', 'asc'));
+    unsubActivities = onSnapshot(
+      q,
+      async (snapshot) => {
+        if (isUnsubscribed) return;
 
-      // Detectar qué actividades necesitan ser descargadas (nuevas o modificadas)
-      const idsToFetch = [];
-      for (const [actId, remoteUpdatedAt] of Object.entries(remoteActivitiesMap)) {
-        const localAct = localActMap.get(actId);
-        if (!localAct || (localAct.updatedAt || localAct.createdAt) !== remoteUpdatedAt) {
-          idsToFetch.push(actId);
-        }
-      }
+        const activities = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          status: docSnap.data().status || 'pending',
+          ...docSnap.data()
+        }));
 
-      // Detectar qué actividades fueron eliminadas remotamente
-      const idsToDelete = [];
-      for (const localAct of localActivities) {
-        if (!remoteActivitiesMap[localAct.id]) {
-          idsToDelete.push(localAct.id);
-        }
-      }
+        currentActivities = activities;
 
-      // Detectar si la estructura académica (Tetras/Materias) cambió
-      const structureChanged = remoteStructureUpdated && (!localStructureDoc || localStructureDoc.updatedAt !== remoteStructureUpdated);
-
-      let newlyAddedActivities = [];
-
-      // Descargar ÚNICAMENTE los documentos que cambiaron de Firestore
-      if (idsToFetch.length > 0) {
-        const fetchPromises = idsToFetch.map(async (actId) => {
-          try {
-            const docSnap = await getDoc(doc(db, 'activities', actId));
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              return {
-                id: docSnap.id,
-                status: data.status || 'pending',
-                ...data
-              };
-            }
-          } catch (fetchErr) {
-            console.warn(`Error al descargar actividad delta ${actId}:`, fetchErr);
+        // Persistir en IndexedDB local
+        try {
+          if (activities.length > 0) {
+            await putManyInStore(STORES.ACTIVITIES, activities);
           }
-          return null;
+          // Limpiar de IndexedDB cualquier actividad eliminada en Firestore
+          const currentLocal = await getAllFromStore(STORES.ACTIVITIES);
+          const remoteIds = new Set(activities.map(a => a.id));
+          for (const localAct of currentLocal) {
+            if (!remoteIds.has(localAct.id)) {
+              await deleteFromStore(STORES.ACTIVITIES, localAct.id);
+            }
+          }
+        } catch (dbErr) {
+          console.warn('Error al sincronizar con IndexedDB local:', dbErr);
+        }
+
+        // Mantener sincronizado el documento metadata en background
+        const actMap = {};
+        activities.forEach(a => {
+          actMap[a.id] = a.updatedAt || a.createdAt || new Date().toISOString();
+        });
+        const metaPayload = {
+          activities: actMap,
+          lastUpdated: new Date().toISOString()
+        };
+        Promise.allSettled([
+          setDoc(META_DATA_REF, metaPayload, { merge: true }),
+          setDoc(META_SYNC_REF, metaPayload, { merge: true }),
+          broadcastRtdbSignal(metaPayload)
+        ]).catch(() => {});
+
+        // Detectar actividades recién añadidas para notificaciones
+        const newlyAdded = [];
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            newlyAdded.push({ id: change.doc.id, ...data });
+          }
         });
 
-        const fetchedResults = await Promise.all(fetchPromises);
-        const validFetched = fetchedResults.filter(Boolean);
-
-        if (validFetched.length > 0) {
-          await putManyInStore(STORES.ACTIVITIES, validFetched);
-          newlyAddedActivities = validFetched;
-        }
-      }
-
-      // Eliminar de IndexedDB las actividades que ya no existen
-      if (idsToDelete.length > 0) {
-        for (const delId of idsToDelete) {
-          await deleteFromStore(STORES.ACTIVITIES, delId);
-        }
-      }
-
-      // Si la estructura cambió, descargar solo ese documento
-      if (structureChanged) {
-        try {
-          const structSnap = await getDoc(CONFIG_STRUCTURE_REF);
-          if (structSnap.exists()) {
-            const structData = structSnap.data();
-            currentStructure = structData.tetras || [];
-            await putInStore(STORES.ACADEMIC_STRUCTURE, {
-              id: LOCAL_STRUCTURE_ID,
-              tetras: currentStructure,
-              updatedAt: remoteStructureUpdated
-            });
-          }
-        } catch (structErr) {
-          console.warn('Error al descargar estructura académica:', structErr);
-        }
-      }
-
-      // Guardar metadata local actualizada en IndexedDB
-      await putInStore(STORES.SYNC_META, {
-        id: LOCAL_META_ID,
-        activities: remoteActivitiesMap,
-        structure_updatedAt: remoteStructureUpdated,
-        lastUpdated: remoteLastUpdated || new Date().toISOString()
-      });
-
-      // Obtener la lista definitiva desde IndexedDB local
-      currentActivities = await getAllFromStore(STORES.ACTIVITIES);
-
-      if (!isUnsubscribed) {
         onDataUpdated({
           activities: currentActivities,
           academicStructure: currentStructure,
           isFromCache: false,
-          newlyAddedActivities: idsToFetch.length > 0 ? newlyAddedActivities : [],
+          newlyAddedActivities: newlyAdded,
           deltaStats: {
-            fetched: idsToFetch.length,
             cached: currentActivities.length
           }
         });
-      }
-    } catch (err) {
-      console.error('Error en procesamiento Delta:', err);
-      if (onError && !isUnsubscribed) onError(err);
-    }
-  };
-
-  // Paso 2: Conectar con RTDB como semáforo primario ultraligero (~50 bytes, 0 lecturas en Firestore)
-  let unsubRtdb = null;
-  try {
-    if (rtdb) {
-      const signalRef = rtdbRef(rtdb, RTDB_SYNC_PATH);
-      unsubRtdb = rtdbOnValue(
-        signalRef,
-        async (snapshot) => {
-          if (snapshot.exists()) {
-            const signalData = snapshot.val() || {};
-            const remoteActivitiesMap = signalData.activities || {};
-            const remoteStructureUpdated = signalData.structure_updatedAt || '';
-            await processDeltaSync(remoteActivitiesMap, remoteStructureUpdated, signalData.lastUpdated);
-          } else {
-            // Si RTDB no tiene señal aún, consultar Firestore metadata una sola vez para inicializar
-            connectFirestoreFallback();
-          }
-        },
-        (rtdbErr) => {
-          console.debug('RTDB no disponible, activando Firestore metadata listener:', rtdbErr.message);
-          connectFirestoreFallback();
-        }
-      );
-    } else {
-      connectFirestoreFallback();
-    }
-  } catch (err) {
-    connectFirestoreFallback();
-  }
-
-  // Fallback con Firestore Metadata si RTDB no está activo
-  function connectFirestoreFallback() {
-    if (unsubFirestoreMeta || isUnsubscribed) return;
-    unsubFirestoreMeta = onSnapshot(
-      META_SYNC_REF,
-      async (snapshot) => {
-        if (!snapshot.exists()) {
-          await initializeMetaDocument();
-          return;
-        }
-        const remoteMeta = snapshot.data() || {};
-        const remoteActivitiesMap = remoteMeta.activities || {};
-        const remoteStructureUpdated = remoteMeta.structure_updatedAt || '';
-        await processDeltaSync(remoteActivitiesMap, remoteStructureUpdated, remoteMeta.lastUpdated);
       },
       (err) => {
-        console.error('Error al escuchar metadata en Firestore:', err);
+        console.error('Error en listener de actividades en Firestore:', err);
         if (onError && !isUnsubscribed) onError(err);
       }
     );
+  } catch (err) {
+    console.error('Error al configurar consulta de actividades:', err);
+    if (onError && !isUnsubscribed) onError(err);
+  }
+
+  // Paso 3: Suscripción a la estructura académica en Firestore
+  try {
+    unsubStructure = onSnapshot(
+      CONFIG_STRUCTURE_REF,
+      async (snapshot) => {
+        if (isUnsubscribed) return;
+
+        if (snapshot.exists()) {
+          const structData = snapshot.data();
+          currentStructure = structData.tetras || [];
+          try {
+            await putInStore(STORES.ACADEMIC_STRUCTURE, {
+              id: LOCAL_STRUCTURE_ID,
+              tetras: currentStructure,
+              updatedAt: structData.updatedAt || new Date().toISOString()
+            });
+          } catch (stErr) {
+            console.warn('Error al guardar estructura en IndexedDB:', stErr);
+          }
+
+          onDataUpdated({
+            activities: currentActivities,
+            academicStructure: currentStructure,
+            isFromCache: false
+          });
+        }
+      },
+      (err) => {
+        console.warn('Aviso en listener de estructura académica:', err.message);
+      }
+    );
+  } catch (err) {
+    console.warn('Aviso al configurar listener de estructura:', err.message);
   }
 
   return () => {
     isUnsubscribed = true;
-    if (unsubRtdb) unsubRtdb();
-    if (unsubFirestoreMeta) unsubFirestoreMeta();
+    if (unsubActivities) unsubActivities();
+    if (unsubStructure) unsubStructure();
   };
 };
 
