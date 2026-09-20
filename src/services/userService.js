@@ -427,171 +427,52 @@ export const confirmUserNotificationReceipt = async (uid) => {
 };
 
 /**
- * Detecta y fusiona usuarios duplicados con el mismo correo electrónico en Firestore.
- * Prioriza el documento más completo y preserva todas las tareas completadas, tokens FCM y roles.
+ * Elimina permanentemente el perfil de un usuario en Firestore y limpia sus subcolecciones asociadas.
  */
-export const detectAndMergeDuplicateUsers = async () => {
+export const deleteUserProfile = async (uid) => {
+  if (!uid) throw new Error('Se requiere el ID del usuario a eliminar.');
+
   try {
-    const usersSnap = await getDocs(collection(db, 'users'));
-    const byEmail = new Map();
-
-    // 1. Agrupar documentos por correo electrónico normalizado
-    for (const docSnap of usersSnap.docs) {
-      const data = docSnap.data();
-      const docId = docSnap.id;
-      const email = (data.email || '').toLowerCase().trim();
-      if (!email) continue;
-
-      // Obtener conteo de completions
-      let completionsDocs = [];
-      try {
-        const compSnap = await getDocs(collection(db, 'users', docId, 'completions'));
-        completionsDocs = compSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      } catch (_) {}
-
-      // Obtener conteo de tokens
-      let tokensDocs = [];
-      try {
-        const tokSnap = await getDocs(collection(db, 'users', docId, 'tokens'));
-        tokensDocs = tokSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      } catch (_) {}
-
-      const item = {
-        docId,
-        ...data,
-        email,
-        completionsCount: completionsDocs.length,
-        completionsDocs,
-        tokensDocs
-      };
-
-      if (!byEmail.has(email)) byEmail.set(email, []);
-      byEmail.get(email).push(item);
-    }
-
-    // 2. Identificar correos duplicados (> 1 documento)
-    const duplicateGroups = Array.from(byEmail.entries()).filter(([_, list]) => list.length > 1);
-    const mergedDetails = [];
-
-    for (const [email, list] of duplicateGroups) {
-      // Calcular puntuación de completitud para cada documento
-      const scoredList = list.map(item => {
-        let score = 0;
-        // Nombre específico
-        if (item.displayName && item.displayName !== 'Estudiante' && item.displayName !== 'Usuario' && item.displayName !== 'Sin nombre') {
-          score += 25;
-        }
-        // Rol
-        if (item.role === 'admin') score += 40;
-        else if (item.role === 'docente') score += 20;
-        else if (item.role === 'estudiante') score += 10;
-        // Notificación confirmada
-        if (item.notificationConfirmed) score += 30;
-        // Tareas completadas
-        score += (item.completionsCount || 0) * 15;
-        // Tokens FCM
-        score += ((item.fcmTokens?.length || 0) + (item.tokensDocs?.length || 0)) * 5;
-        // Proveedor de autenticación
-        if (item.authProvider) score += 10;
-        if (item.photoURL) score += 5;
-
-        return { ...item, score };
-      });
-
-      // Ordenar: el de mayor puntuación primero (el más completo)
-      scoredList.sort((a, b) => b.score - a.score);
-      const primary = scoredList[0];
-      const secondaries = scoredList.slice(1);
-
-      console.log(`[Merge] Fusionando ${secondaries.length} duplicados para ${email} en documento principal ${primary.docId}`);
-
-      // Recopilar todos los tokens
-      const allTokens = new Set(primary.fcmTokens || []);
-      const allCompletions = new Map(primary.completionsDocs.map(c => [c.id, c]));
-
-      let mergedNotificationConfirmed = primary.notificationConfirmed || false;
-      let mergedDisplayName = primary.displayName;
-      let mergedRole = primary.role || 'estudiante';
-      let mergedPhotoURL = primary.photoURL || null;
-
-      for (const sec of secondaries) {
-        // Tokens del arreglo
-        (sec.fcmTokens || []).forEach(t => t && allTokens.add(t));
-        // Subcolección de tokens hacia primary
-        for (const tDoc of sec.tokensDocs) {
-          if (tDoc.token) allTokens.add(tDoc.token);
-          try {
-            await setDoc(doc(db, 'users', primary.docId, 'tokens', tDoc.id || tDoc.token), tDoc, { merge: true });
-          } catch (_) {}
-        }
-
-        // Subcolección de completions hacia primary
-        for (const cDoc of sec.completionsDocs) {
-          if (!allCompletions.has(cDoc.id) || cDoc.status === 'completed') {
-            allCompletions.set(cDoc.id, cDoc);
-            try {
-              await setDoc(doc(db, 'users', primary.docId, 'completions', cDoc.id), cDoc, { merge: true });
-            } catch (_) {}
-          }
-        }
-
-        if (sec.notificationConfirmed) mergedNotificationConfirmed = true;
-        if ((!mergedDisplayName || mergedDisplayName === 'Estudiante') && sec.displayName && sec.displayName !== 'Estudiante') {
-          mergedDisplayName = sec.displayName;
-        }
-        if (sec.role === 'admin') mergedRole = 'admin';
-        else if (sec.role === 'docente' && mergedRole !== 'admin') mergedRole = 'docente';
-        if (!mergedPhotoURL && sec.photoURL) mergedPhotoURL = sec.photoURL;
-
-        // Eliminar documento secundario duplicado
-        try {
-          for (const cDoc of sec.completionsDocs) {
-            await deleteDoc(doc(db, 'users', sec.docId, 'completions', cDoc.id)).catch(() => {});
-          }
-          for (const tDoc of sec.tokensDocs) {
-            await deleteDoc(doc(db, 'users', sec.docId, 'tokens', tDoc.id)).catch(() => {});
-          }
-          await deleteDoc(doc(db, 'users', sec.docId));
-        } catch (e) {
-          console.warn(`Error al eliminar doc secundario ${sec.docId}:`, e);
-        }
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      if ((data.email || '').toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        throw new Error('No es posible eliminar al Administrador Principal del sistema.');
       }
-
-      // Actualizar documento principal con datos fusionados
-      const updatedPrimaryData = {
-        displayName: mergedDisplayName || primary.displayName || 'Estudiante',
-        role: mergedRole,
-        fcmTokens: Array.from(allTokens),
-        notificationConfirmed: mergedNotificationConfirmed,
-        photoURL: mergedPhotoURL,
-        updatedAt: new Date().toISOString()
-      };
-
-      await updateDoc(doc(db, 'users', primary.docId), updatedPrimaryData);
-
-      mergedDetails.push({
-        email,
-        primaryDocId: primary.docId,
-        mergedCount: secondaries.length,
-        deletedIds: secondaries.map(s => s.docId),
-        displayName: updatedPrimaryData.displayName,
-        totalCompletions: allCompletions.size,
-        totalTokens: allTokens.size
-      });
     }
 
-    return {
-      success: true,
-      totalScanned: usersSnap.size,
-      duplicateGroupsCount: duplicateGroups.length,
-      mergedUsersCount: mergedDetails.reduce((acc, m) => acc + m.mergedCount, 0),
-      details: mergedDetails
-    };
+    // 1. Eliminar subcolección de tareas completadas
+    try {
+      const completionsSnap = await getDocs(collection(db, 'users', uid, 'completions'));
+      for (const cDoc of completionsSnap.docs) {
+        await deleteDoc(doc(db, 'users', uid, 'completions', cDoc.id)).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Advertencia al limpiar tareas de usuario:', e);
+    }
+
+    // 2. Eliminar subcolección de tokens FCM
+    try {
+      const tokensSnap = await getDocs(collection(db, 'users', uid, 'tokens'));
+      for (const tDoc of tokensSnap.docs) {
+        await deleteDoc(doc(db, 'users', uid, 'tokens', tDoc.id)).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Advertencia al limpiar tokens de usuario:', e);
+    }
+
+    // 3. Eliminar el documento principal del usuario
+    await deleteDoc(userRef);
+
+    return { success: true };
   } catch (err) {
-    console.error('Error al detectar y fusionar usuarios duplicados:', err);
+    console.error(`Error al eliminar perfil de usuario ${uid}:`, err);
     throw err;
   }
 };
+
 
 
 

@@ -32,14 +32,16 @@ import {
   RefreshCw,
   Radio,
   ExternalLink,
-  Calendar
+  Calendar,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { 
   createAppUser, 
   subscribeToUsers, 
   updateUserRole, 
   updateUserStatus,
-  detectAndMergeDuplicateUsers,
+  deleteUserProfile,
   SUPER_ADMIN_EMAIL 
 } from '../services/userService';
 import {
@@ -102,6 +104,8 @@ export const ConfigModal = ({
   const [usersList, setUsersList] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
+  const [userViewMode, setUserViewMode] = useState('table'); // 'table' | 'grid'
+  const [deletingUserId, setDeletingUserId] = useState(null);
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -109,32 +113,7 @@ export const ConfigModal = ({
   const [creatingUser, setCreatingUser] = useState(false);
   const [userActionSuccess, setUserActionSuccess] = useState('');
   const [userActionError, setUserActionError] = useState('');
-
-  // Estados para Detección y Fusión de Duplicados
-  const [deduplicatingUsers, setDeduplicatingUsers] = useState(false);
-  const [deduplicateResult, setDeduplicateResult] = useState(null);
-  const [deduplicateError, setDeduplicateError] = useState('');
-
-  const handleRunDeduplication = async () => {
-    if (!isAdmin) return;
-    setDeduplicatingUsers(true);
-    setDeduplicateResult(null);
-    setDeduplicateError('');
-
-    try {
-      const result = await detectAndMergeDuplicateUsers();
-      setDeduplicateResult(result);
-      setTimeout(() => {
-        setDeduplicateResult(null);
-      }, 10000);
-    } catch (err) {
-      console.error('Error al fusionar duplicados:', err);
-      setDeduplicateError(err.message || 'Error al procesar la fusión de duplicados.');
-      setTimeout(() => setDeduplicateError(''), 8000);
-    } finally {
-      setDeduplicatingUsers(false);
-    }
-  };
+  const [showRegisterUserModal, setShowRegisterUserModal] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -473,6 +452,46 @@ export const ConfigModal = ({
     }
   };
 
+  const handleDeleteUser = async (user) => {
+    if (!isAdmin) return;
+    const targetUid = user?.uid || user?.id;
+    if (!targetUid) return;
+
+    const isSuper = (user.email || '').toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+    if (isSuper) {
+      alert('No es posible eliminar al Administrador Principal.');
+      return;
+    }
+
+    if (targetUid === currentUser?.uid) {
+      alert('No puedes eliminar tu propia cuenta mientras tengas una sesión activa.');
+      return;
+    }
+
+    const userName = user.displayName || user.email || 'este usuario';
+    const confirmed = window.confirm(
+      `¿Estás seguro de que deseas eliminar permanentemente el perfil de "${userName}" (${user.email})?\n\nEsta acción eliminará su registro de Firestore y su progreso de actividades completadas.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingUserId(targetUid);
+    setUserActionError('');
+    setUserActionSuccess('');
+
+    try {
+      await deleteUserProfile(targetUid);
+      setUserActionSuccess(`¡Perfil de "${userName}" eliminado permanentemente!`);
+      setTimeout(() => setUserActionSuccess(''), 4000);
+    } catch (err) {
+      console.error('Error al eliminar perfil de usuario:', err);
+      setUserActionError(err.message || 'No se pudo eliminar el perfil del usuario.');
+      setTimeout(() => setUserActionError(''), 6000);
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   // --- Guardar cambios globales de estructura ---
   const handleSaveAll = async () => {
     setIsSaving(true);
@@ -603,7 +622,11 @@ export const ConfigModal = ({
         </div>
 
         {/* Contenido de Pestañas */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 text-sm touch-scroll max-w-7xl w-full mx-auto">
+        <div className={`flex-1 min-h-0 w-full mx-auto ${
+          activeTab === 'users' 
+            ? 'flex flex-col overflow-hidden p-3 sm:p-5 lg:p-6 space-y-3 max-w-7xl' 
+            : 'overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl touch-scroll text-sm'
+        }`}>
           {error && (
             <div className="flex items-center space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -858,373 +881,438 @@ export const ConfigModal = ({
 
           {/* PESTAÑA 3: GESTIÓN DE USUARIOS Y DOCENTES (ADMIN ONLY) */}
           {activeTab === 'users' && isAdmin && (
-            <div className="space-y-6">
+            <div className="flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
               
-              {/* Tarjeta Informativa / Header de Admin */}
-              <div className="p-4 bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2.5 bg-indigo-500/20 text-indigo-300 rounded-xl border border-indigo-400/30">
-                    <Shield className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                      <span>Administrador de Perfiles y Autenticación</span>
-                    </h3>
-                    <p className="text-xs text-indigo-200/80">
-                      Crea cuentas en Firebase Auth y asigna perfiles en Firestore (`users/[uid]`).
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
-                  <div className="px-3 py-1.5 bg-white/10 rounded-xl backdrop-blur-xs border border-white/10">
-                    <span className="text-slate-300">Total: </span>
+              {/* Encabezado con Contadores a la Izquierda y Botón Registrar a la Derecha */}
+              <div className="p-3 sm:p-4 bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-shrink-0">
+                
+                {/* Contadores a la izquierda (Sin título previo) */}
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
+                  <div className="px-2.5 sm:px-3 py-1.5 bg-white/10 rounded-xl backdrop-blur-xs border border-white/10 flex items-center gap-1.5">
+                    <span className="text-slate-300">Total:</span>
                     <strong className="text-white">{usersList.length}</strong>
                   </div>
-                  <div className="px-3 py-1.5 bg-emerald-500/20 rounded-xl backdrop-blur-xs border border-emerald-400/30">
-                    <span className="text-emerald-200">Estudiantes: </span>
+                  <div className="px-2.5 sm:px-3 py-1.5 bg-emerald-500/20 rounded-xl backdrop-blur-xs border border-emerald-400/30 flex items-center gap-1.5">
+                    <span className="text-emerald-200">Estudiantes:</span>
                     <strong className="text-white">{usersList.filter(u => u.role === 'estudiante').length}</strong>
                   </div>
-                  <div className="px-3 py-1.5 bg-white/10 rounded-xl backdrop-blur-xs border border-white/10">
-                    <span className="text-slate-300">Docentes / Tutores: </span>
+                  <div className="px-2.5 sm:px-3 py-1.5 bg-white/10 rounded-xl backdrop-blur-xs border border-white/10 flex items-center gap-1.5">
+                    <span className="text-slate-300">Docentes / Tutores:</span>
                     <strong className="text-white">{usersList.filter(u => u.role === 'docente' || (!u.role && u.role !== 'admin')).length}</strong>
                   </div>
-                  <div className="px-3 py-1.5 bg-emerald-500/30 rounded-xl backdrop-blur-xs border border-emerald-400/40 flex items-center gap-1.5">
+                  <div className="px-2.5 sm:px-3 py-1.5 bg-emerald-500/30 rounded-xl backdrop-blur-xs border border-emerald-400/40 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                    <span className="text-emerald-200">Notificación Confirmada: </span>
+                    <span className="text-emerald-200">Confirmados:</span>
                     <strong className="text-white">{usersList.filter(u => u.notificationConfirmed).length}</strong>
                   </div>
-                  <div className="px-3 py-1.5 bg-indigo-500/30 rounded-xl backdrop-blur-xs border border-indigo-400/30">
-                    <span className="text-indigo-200">Admins: </span>
+                  <div className="px-2.5 sm:px-3 py-1.5 bg-indigo-500/30 rounded-xl backdrop-blur-xs border border-indigo-400/30 flex items-center gap-1.5">
+                    <span className="text-indigo-200">Admins:</span>
                     <strong className="text-white">{usersList.filter(u => u.role === 'admin').length}</strong>
                   </div>
                 </div>
-              </div>
 
-              {/* Herramienta de Detección y Fusión de Duplicados */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-indigo-50/80 border border-indigo-200/90 rounded-2xl shadow-2xs">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-xs">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-indigo-950">
-                      Detector y Fusión de Correos Duplicados
-                    </h4>
-                    <p className="text-[11px] text-indigo-700/80">
-                      Detecta cuentas repetidas con el mismo correo, fusionándolas en el documento más completo y preservando tareas, roles y tokens.
-                    </p>
-                  </div>
+                {/* Botón Registrar Usuario a la derecha */}
+                <div className="flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserActionError('');
+                      setUserActionSuccess('');
+                      setShowRegisterUserModal(true);
+                    }}
+                    className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-500 hover:bg-indigo-600 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-950/40 border border-indigo-400/40 cursor-pointer"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>Registrar Usuario</span>
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleRunDeduplication}
-                  disabled={deduplicatingUsers}
-                  className="inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50 flex-shrink-0 cursor-pointer"
-                >
-                  {deduplicatingUsers ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Analizando y fusionando...</span>
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Detectar y Fusionar Ahora</span>
-                    </>
-                  )}
-                </button>
               </div>
 
-              {deduplicateResult && (
-                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 space-y-2 animate-in fade-in">
-                  <div className="flex items-center space-x-2 font-bold text-emerald-900">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    <span>
-                      {deduplicateResult.mergedUsersCount > 0
-                        ? `¡Fusión completada! Se fusionaron ${deduplicateResult.mergedUsersCount} cuentas duplicadas en ${deduplicateResult.duplicateGroupsCount} correos.`
-                        : '¡Excelente! No se encontraron correos duplicados en la base de datos.'}
-                    </span>
-                  </div>
-                  {deduplicateResult.details && deduplicateResult.details.length > 0 && (
-                    <div className="pl-6 space-y-1 text-[11px] text-emerald-700">
-                      {deduplicateResult.details.map((det, i) => (
-                        <div key={i}>
-                          • <strong>{det.email}</strong> ({det.displayName}): Fusionados {det.mergedCount} duplicados &rarr; ID principal: <code className="bg-emerald-100 px-1 rounded">{det.primaryDocId.substring(0, 8)}...</code> (Tareas: {det.totalCompletions}, Tokens: {det.totalTokens})
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {/* Mensajes de Acción de Usuario */}
+              {userActionSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-center space-x-2 animate-in fade-in flex-shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span className="font-semibold">{userActionSuccess}</span>
                 </div>
               )}
 
-              {deduplicateError && (
-                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center space-x-2">
+              {userActionError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center space-x-2 animate-in fade-in flex-shrink-0">
                   <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                  <span>{deduplicateError}</span>
+                  <span>{userActionError}</span>
                 </div>
               )}
 
-              {/* Formulario de Creación de Usuario */}
-              <div className="bg-slate-50 border border-slate-200 p-4 sm:p-5 rounded-2xl space-y-4">
-                <div className="flex items-center space-x-2 text-slate-800 font-bold text-sm">
-                  <UserPlus className="w-4 h-4 text-indigo-600" />
-                  <span>Crear Nuevo Usuario / Docente</span>
+              {/* Barra de Controles: Título, Buscador y Selector de Vista (Tabla / Cuadrícula) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 flex-shrink-0 pt-0.5">
+                <div className="flex items-center space-x-2">
+                  <Users className="w-4 h-4 text-slate-500" />
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Perfiles de Usuario ({filteredUsers.length})
+                  </h4>
                 </div>
 
-                {userActionSuccess && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    <span>{userActionSuccess}</span>
-                  </div>
-                )}
-
-                {userActionError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                    <span>{userActionError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleCreateUser} className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {/* Nombre Completo */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                        Nombre Completo *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej. Dr. Mario Silva"
-                        value={newUserName}
-                        onChange={(e) => setNewUserName(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[42px]"
-                      />
-                    </div>
-
-                    {/* Correo Electrónico */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                        Correo Institucional *
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="usuario@ucnl.edu.mx"
-                        value={newUserEmail}
-                        onChange={(e) => setNewUserEmail(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[42px]"
-                      />
-                    </div>
-
-                    {/* Contraseña Inicial */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                        Contraseña Inicial *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Mínimo 6 caracteres"
-                        value={newUserPassword}
-                        onChange={(e) => setNewUserPassword(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[42px]"
-                      />
-                    </div>
-
-                    {/* Rol */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-                        Rol en Plataforma *
-                      </label>
-                      <select
-                        value={newUserRole}
-                        onChange={(e) => setNewUserRole(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base sm:text-xs bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[42px]"
-                      >
-                        <option value="estudiante">Estudiante (Solo Consulta y Entrega)</option>
-                        <option value="docente">Docente / Tutor (Publicar y Editar Tareas)</option>
-                        <option value="admin">Administrador (Control Total)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <p className="text-[11px] text-slate-400 flex items-center space-x-1">
-                      <Lock className="w-3 h-3 text-slate-400" />
-                      <span>El usuario se registra mediante Firebase Auth y almacena su perfil en Firestore.</span>
-                    </p>
-                    <button
-                      type="submit"
-                      disabled={creatingUser}
-                      className="inline-flex items-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50"
-                    >
-                      {creatingUser ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Registrando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="w-4 h-4" />
-                          <span>Registrar Usuario</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Lista y Búsqueda de Usuarios */}
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-slate-500" />
-                    <span>Perfiles de Usuario Registrados ({filteredUsers.length})</span>
-                  </h4>
-
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   {/* Buscador de usuarios */}
-                  <div className="relative w-full sm:w-64">
+                  <div className="relative flex-1 sm:w-64">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                     <input
                       type="text"
                       placeholder="Buscar por nombre o correo..."
                       value={userSearch}
                       onChange={(e) => setUserSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs"
                     />
+                    {userSearch && (
+                      <button
+                        onClick={() => setUserSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 rounded-full hover:bg-slate-100"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Toggle de Vistas: Tabla vs Cuadrícula */}
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 shadow-2xs flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setUserViewMode('table')}
+                      className={`p-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                        userViewMode === 'table'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="Vista de Tabla"
+                      aria-label="Vista de Tabla"
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline text-[11px]">Tabla</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserViewMode('grid')}
+                      className={`p-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer ${
+                        userViewMode === 'grid'
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                      title="Vista de Cuadrícula"
+                      aria-label="Vista de Cuadrícula"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline text-[11px]">Cuadrícula</span>
+                    </button>
                   </div>
                 </div>
+              </div>
 
+              {/* Contenedor Principal: Tabla o Cuadrícula con Scroll */}
+              <div className="flex-1 min-h-0 border border-slate-200 rounded-2xl overflow-hidden shadow-xs bg-slate-50/50 flex flex-col">
                 {usersLoading ? (
-                  <div className="py-8 flex flex-col items-center justify-center space-y-2">
+                  <div className="flex-1 flex flex-col items-center justify-center space-y-2 py-12 bg-white">
                     <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
                     <span className="text-xs text-slate-500">Consultando perfiles en Firestore...</span>
                   </div>
                 ) : filteredUsers.length === 0 ? (
-                  <div className="p-8 text-center text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-2xl">
-                    No se encontraron usuarios que coincidan con la búsqueda.
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400 text-xs bg-white">
+                    <Users className="w-8 h-8 text-slate-300 mb-2" />
+                    <p className="font-semibold text-slate-600">No se encontraron usuarios</p>
+                    <p className="text-[11px] text-slate-400">Intenta con otro término de búsqueda o registra un nuevo usuario.</p>
                   </div>
-                ) : (
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
-                          <tr>
-                            <th className="py-3 px-4">Usuario</th>
-                            <th className="py-3 px-4">Correo Electrónico</th>
-                            <th className="py-3 px-4">Rol Asignado</th>
-                            <th className="py-3 px-4">Estado</th>
-                            <th className="py-3 px-4">Registrado Por</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {filteredUsers.map((user) => {
-                            const isSuper = user.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-                            const isCurrent = user.uid === currentUser?.uid;
+                ) : userViewMode === 'grid' ? (
+                  /* --- VISTA DE CUADRÍCULA --- */
+                  <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 touch-scroll bg-slate-50">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                      {filteredUsers.map((user) => {
+                        const isSuper = user.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+                        const isCurrent = user.uid === currentUser?.uid;
+                        const isDeleting = deletingUserId === (user.uid || user.id);
 
-                            return (
-                              <tr key={user.uid || user.id} className="hover:bg-slate-50/80 transition">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center space-x-3">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white uppercase shadow-xs ${
-                                      user.role === 'admin' 
-                                        ? 'bg-gradient-to-tr from-indigo-600 to-purple-600' 
-                                        : user.role === 'estudiante'
-                                        ? 'bg-gradient-to-tr from-emerald-600 to-teal-600'
-                                        : 'bg-gradient-to-tr from-blue-600 to-cyan-600'
-                                    }`}>
-                                      {user.displayName ? user.displayName[0] : (user.email ? user.email[0] : 'U')}
-                                    </div>
-                                    <div>
-                                      <p className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
-                                        <span>{user.displayName || 'Sin nombre'}</span>
-                                        {user.notificationConfirmed && (
-                                          <span 
-                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs"
-                                            title={`Notificación confirmada: ${user.notificationConfirmedAt ? new Date(user.notificationConfirmedAt).toLocaleString('es-MX') : 'Confirmado'}`}
-                                          >
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 inline" />
-                                            <span>Confirmado</span>
-                                          </span>
-                                        )}
-                                        {isSuper && (
-                                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200">
-                                            Super Admin
-                                          </span>
-                                        )}
-                                        {isCurrent && (
-                                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 font-bold">
-                                            Tú
-                                          </span>
-                                        )}
-                                      </p>
-                                      <span className="text-[10px] text-slate-400 font-mono">
-                                        UID: {(user.uid || user.id || '').substring(0, 10)}...
-                                      </span>
-                                    </div>
+                        return (
+                          <div 
+                            key={user.uid || user.id} 
+                            className="bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-3.5 relative group"
+                          >
+                            <div>
+                              {/* Header con Avatar, Nombre, Email y Botón Borrar */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center space-x-2.5 min-w-0">
+                                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white uppercase shadow-xs flex-shrink-0 ${
+                                    user.role === 'admin' 
+                                      ? 'bg-gradient-to-tr from-indigo-600 to-purple-600' 
+                                      : user.role === 'estudiante'
+                                      ? 'bg-gradient-to-tr from-emerald-600 to-teal-600'
+                                      : 'bg-gradient-to-tr from-blue-600 to-cyan-600'
+                                  }`}>
+                                    {user.displayName ? user.displayName[0] : (user.email ? user.email[0] : 'U')}
                                   </div>
-                                </td>
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-xs text-slate-800 truncate flex items-center gap-1">
+                                      <span className="truncate">{user.displayName || 'Sin nombre'}</span>
+                                      {user.notificationConfirmed && (
+                                        <CheckCircle2 
+                                          className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" 
+                                          title={`Notificación confirmada: ${user.notificationConfirmedAt ? new Date(user.notificationConfirmedAt).toLocaleString('es-MX') : 'Confirmado'}`}
+                                        />
+                                      )}
+                                    </p>
+                                    <p className="text-[11px] text-slate-500 truncate font-mono" title={user.email}>
+                                      {user.email}
+                                    </p>
+                                  </div>
+                                </div>
 
-                                <td className="py-3 px-4 font-mono text-slate-600">
-                                  {user.email}
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  {isSuper ? (
-                                    <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                                      <Shield className="w-3 h-3 text-indigo-600" />
-                                      <span>Administrador</span>
-                                    </span>
-                                  ) : (
-                                    <select
-                                      value={user.role || 'estudiante'}
-                                      onChange={(e) => handleRoleChange(user, e.target.value)}
-                                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition focus:outline-none ${
-                                        user.role === 'admin'
-                                          ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
-                                          : user.role === 'estudiante'
-                                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                                          : 'bg-blue-50 border-blue-200 text-blue-800'
-                                      }`}
+                                {/* Botón Borrar Perfil */}
+                                <div className="flex-shrink-0">
+                                  {isSuper || isCurrent ? (
+                                    <span 
+                                      className="inline-flex p-1.5 text-slate-300 cursor-not-allowed" 
+                                      title={isSuper ? "Administrador Principal protegido" : "No puedes eliminar tu propia cuenta activa"}
                                     >
-                                      <option value="estudiante">Estudiante</option>
-                                      <option value="docente">Docente / Tutor</option>
-                                      <option value="admin">Administrador</option>
-                                    </select>
-                                  )}
-                                </td>
-
-                                <td className="py-3 px-4">
-                                  {isSuper ? (
-                                    <span className="inline-flex items-center text-emerald-700 font-bold text-[11px]">
-                                      <Check className="w-3 h-3 mr-1" /> Activo
+                                      <Lock className="w-4 h-4" />
                                     </span>
                                   ) : (
                                     <button
-                                      onClick={() => handleStatusChange(user, user.status === 'inactive' ? 'active' : 'inactive')}
-                                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition ${
-                                        user.status === 'inactive'
-                                          ? 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
-                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700'
-                                      }`}
+                                      type="button"
+                                      onClick={() => handleDeleteUser(user)}
+                                      disabled={isDeleting}
+                                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition disabled:opacity-50 cursor-pointer"
+                                      title="Eliminar perfil permanentemente"
+                                      aria-label={`Eliminar a ${user.displayName || user.email}`}
                                     >
-                                      {user.status === 'inactive' ? 'Inactivo' : 'Activo'}
+                                      {isDeleting ? (
+                                        <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                                      ) : (
+                                        <Trash2 className="w-4 h-4" />
+                                      )}
                                     </button>
                                   )}
-                                </td>
+                                </div>
+                              </div>
 
-                                <td className="py-3 px-4 text-slate-500 text-[11px]">
-                                  {user.createdBy || 'Sistema'}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                              {/* Badges descriptivos */}
+                              <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
+                                {user.notificationConfirmed && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    <span>Confirmado</span>
+                                  </span>
+                                )}
+                                {isSuper && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 font-bold border border-amber-200">
+                                    Super Admin
+                                  </span>
+                                )}
+                                {isCurrent && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-800 font-bold border border-blue-200">
+                                    Tú
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-slate-400 font-mono px-1.5 py-0.5 bg-slate-50 rounded border border-slate-100 truncate max-w-[130px]">
+                                  UID: {(user.uid || user.id || '').substring(0, 8)}...
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Controles de Rol y Estado */}
+                            <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                              <div>
+                                {isSuper ? (
+                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    <Shield className="w-3 h-3 text-indigo-600" />
+                                    <span>Administrador</span>
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={user.role || 'estudiante'}
+                                    onChange={(e) => handleRoleChange(user, e.target.value)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition focus:outline-none ${
+                                      user.role === 'admin'
+                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                                        : user.role === 'estudiante'
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                        : 'bg-blue-50 border-blue-200 text-blue-800'
+                                    }`}
+                                  >
+                                    <option value="estudiante">Estudiante</option>
+                                    <option value="docente">Docente / Tutor</option>
+                                    <option value="admin">Administrador</option>
+                                  </select>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                {isSuper ? (
+                                  <span className="inline-flex items-center text-emerald-700 font-bold text-[11px]">
+                                    <Check className="w-3 h-3 mr-0.5" /> Activo
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(user, user.status === 'inactive' ? 'active' : 'inactive')}
+                                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition ${
+                                      user.status === 'inactive'
+                                        ? 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700'
+                                    }`}
+                                  >
+                                    {user.status === 'inactive' ? 'Inactivo' : 'Activo'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                  </div>
+                ) : (
+                  /* --- VISTA DE TABLA --- */
+                  <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto touch-scroll bg-white">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold sticky top-0 z-10 shadow-2xs">
+                        <tr>
+                          <th className="py-3 px-4 bg-slate-50">Usuario</th>
+                          <th className="py-3 px-4 bg-slate-50">Correo Electrónico</th>
+                          <th className="py-3 px-4 bg-slate-50">Rol Asignado</th>
+                          <th className="py-3 px-4 bg-slate-50">Estado</th>
+                          <th className="py-3 px-4 bg-slate-50">Registrado Por</th>
+                          <th className="py-3 px-4 bg-slate-50 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredUsers.map((user) => {
+                          const isSuper = user.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+                          const isCurrent = user.uid === currentUser?.uid;
+                          const isDeleting = deletingUserId === (user.uid || user.id);
+
+                          return (
+                            <tr key={user.uid || user.id} className="hover:bg-slate-50/80 transition">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center space-x-3">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white uppercase shadow-xs flex-shrink-0 ${
+                                    user.role === 'admin' 
+                                      ? 'bg-gradient-to-tr from-indigo-600 to-purple-600' 
+                                      : user.role === 'estudiante'
+                                      ? 'bg-gradient-to-tr from-emerald-600 to-teal-600'
+                                      : 'bg-gradient-to-tr from-blue-600 to-cyan-600'
+                                  }`}>
+                                    {user.displayName ? user.displayName[0] : (user.email ? user.email[0] : 'U')}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                                      <span className="truncate">{user.displayName || 'Sin nombre'}</span>
+                                      {user.notificationConfirmed && (
+                                        <span 
+                                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs flex-shrink-0"
+                                          title={`Notificación confirmada: ${user.notificationConfirmedAt ? new Date(user.notificationConfirmedAt).toLocaleString('es-MX') : 'Confirmado'}`}
+                                        >
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 inline" />
+                                          <span>Confirmado</span>
+                                        </span>
+                                      )}
+                                      {isSuper && (
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 font-bold border border-amber-200 flex-shrink-0">
+                                          Super Admin
+                                        </span>
+                                      )}
+                                      {isCurrent && (
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 font-bold flex-shrink-0">
+                                          Tú
+                                        </span>
+                                      )}
+                                    </p>
+                                    <span className="text-[10px] text-slate-400 font-mono block truncate">
+                                      UID: {(user.uid || user.id || '').substring(0, 10)}...
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-4 font-mono text-slate-600 truncate max-w-[200px]">
+                                {user.email}
+                              </td>
+
+                              <td className="py-3 px-4">
+                                {isSuper ? (
+                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                    <Shield className="w-3 h-3 text-indigo-600" />
+                                    <span>Administrador</span>
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={user.role || 'estudiante'}
+                                    onChange={(e) => handleRoleChange(user, e.target.value)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition focus:outline-none ${
+                                      user.role === 'admin'
+                                        ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                                        : user.role === 'estudiante'
+                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                        : 'bg-blue-50 border-blue-200 text-blue-800'
+                                    }`}
+                                  >
+                                    <option value="estudiante">Estudiante</option>
+                                    <option value="docente">Docente / Tutor</option>
+                                    <option value="admin">Administrador</option>
+                                  </select>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4">
+                                {isSuper ? (
+                                  <span className="inline-flex items-center text-emerald-700 font-bold text-[11px]">
+                                    <Check className="w-3 h-3 mr-1" /> Activo
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleStatusChange(user, user.status === 'inactive' ? 'active' : 'inactive')}
+                                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition ${
+                                      user.status === 'inactive'
+                                        ? 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700'
+                                    }`}
+                                  >
+                                    {user.status === 'inactive' ? 'Inactivo' : 'Activo'}
+                                  </button>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-4 text-slate-500 text-[11px] truncate max-w-[150px]">
+                                {user.createdBy || 'Sistema'}
+                              </td>
+
+                              {/* Columna de Acciones: Botón Borrar */}
+                              <td className="py-3 px-4 text-right">
+                                {isSuper || isCurrent ? (
+                                  <span 
+                                    className="inline-flex p-1.5 text-slate-300 cursor-not-allowed" 
+                                    title={isSuper ? "Administrador Principal protegido" : "No puedes eliminar tu propia cuenta activa"}
+                                  >
+                                    <Lock className="w-4 h-4" />
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteUser(user)}
+                                    disabled={isDeleting}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition disabled:opacity-50 cursor-pointer inline-flex items-center justify-center"
+                                    title="Eliminar perfil permanentemente"
+                                    aria-label={`Eliminar a ${user.displayName || user.email}`}
+                                  >
+                                    {isDeleting ? (
+                                      <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                                    ) : (
+                                      <Trash2 className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
@@ -1679,6 +1767,8 @@ export const ConfigModal = ({
                 </span>
               ) : activeTab === 'notifications' ? (
                 'Los ajustes de horarios y alertas se guardarán en Firebase.'
+              ) : activeTab === 'users' ? (
+                'Los cambios de roles y estados en usuarios se aplican en tiempo real en Firebase.'
               ) : (
                 'Los cambios en Tetras y Materias se sincronizarán en Firestore e IndexedDB.'
               )}
@@ -1733,6 +1823,160 @@ export const ConfigModal = ({
         </div>
 
       </div>
+
+      {/* Modal Independiente para Registrar Nuevo Usuario */}
+      {showRegisterUserModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setShowRegisterUserModal(false)}
+        >
+          <div 
+            className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del Modal */}
+            <div className="px-5 py-4 bg-gradient-to-r from-indigo-900 via-blue-900 to-slate-900 text-white flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-white">Registrar Nuevo Usuario</h3>
+                  <p className="text-[11px] text-indigo-200/80">Crea credenciales en Firebase Auth y perfil en Firestore</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRegisterUserModal(false)}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition"
+                title="Cerrar modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleCreateUser} className="p-5 sm:p-6 space-y-4">
+              {userActionSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center space-x-2 animate-in fade-in">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span className="font-semibold">{userActionSuccess}</span>
+                </div>
+              )}
+
+              {userActionError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center space-x-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>{userActionError}</span>
+                </div>
+              )}
+
+              <div className="space-y-3.5">
+                {/* Nombre Completo */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nombre Completo <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Dr. Mario Silva"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Correo Electrónico */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Correo Institucional <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="usuario@ucnl.edu.mx"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* Contraseña Inicial */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Contraseña Inicial <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Key className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Mínimo 6 caracteres"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Rol en Plataforma */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Rol en Plataforma <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Shield className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <select
+                      value={newUserRole}
+                      onChange={(e) => setNewUserRole(e.target.value)}
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 text-xs bg-slate-50 focus:bg-white font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="estudiante">Estudiante (Solo Consulta y Entrega)</option>
+                      <option value="docente">Docente / Tutor (Publicar y Editar Tareas)</option>
+                      <option value="admin">Administrador (Control Total)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones de acción del Modal */}
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowRegisterUserModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingUser}
+                  className="inline-flex items-center space-x-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50"
+                >
+                  {creatingUser ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Registrando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Registrar Usuario</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
