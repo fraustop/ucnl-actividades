@@ -36,7 +36,9 @@ import {
   Check,
   AppWindow,
   Globe,
-  ShieldAlert
+  ShieldAlert,
+  HelpCircle,
+  Compass
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ACTIVITY_TYPES } from '../types/constants';
@@ -94,6 +96,13 @@ export const ActivityWorkspaceModal = ({
   const [linkSuccess, setLinkSuccess] = useState('');
   const [linkError, setLinkError] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showSecurityExplanation, setShowSecurityExplanation] = useState(false);
+
+  // Abrir en el navegador predeterminado
+  const handleOpenDefaultBrowser = (url) => {
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   // Abrir ventana emergente (Pop-out / Companion window)
   const handleOpenPopout = (url) => {
@@ -369,13 +378,34 @@ export const ActivityWorkspaceModal = ({
           </div>
 
           <div className="flex items-center space-x-1.5 flex-shrink-0">
+            {/* Botón Explicativo: ¿Por qué el sitio no abre dentro de la app? */}
+            <button
+              onClick={() => setShowSecurityExplanation(true)}
+              className="px-2 py-1 text-[11px] font-bold rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition flex items-center gap-1 cursor-pointer"
+              title="Explicar por qué algunos sitios (como la universidad) rechazan la conexión en la app"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">¿Por qué no abre?</span>
+            </button>
+
+            {/* Botón Principal: Abrir en el Navegador Predeterminado */}
+            <button
+              onClick={() => handleOpenDefaultBrowser(originalUrl)}
+              className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+              title="Abrir página en el navegador predeterminado de tu equipo"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Abrir en Navegador</span>
+              <ExternalLink className="w-3 h-3 ml-0.5" />
+            </button>
+
             {/* Si es Office / PDF / Web, permitir alternar con Google Docs Viewer */}
             {(type === 'pdf' || type === 'office' || type === 'web') && (
               <button
                 onClick={() => setUseGoogleDocsFallback(!useGoogleDocsFallback)}
                 className={`px-2 py-1 text-[10px] font-bold rounded-lg transition border ${
                   useGoogleDocsFallback
-                    ? 'bg-blue-600 text-white border-blue-500 shadow-2xs'
+                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-2xs'
                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
                 }`}
                 title="Alternar entre visualizador directo y Google Docs Viewer (útil si la universidad bloquea la conexión)"
@@ -388,10 +418,10 @@ export const ActivityWorkspaceModal = ({
             <button
               onClick={() => handleOpenPopout(originalUrl)}
               className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition flex items-center gap-1 text-xs font-bold"
-              title="Abrir en Ventana Paralela / Emergente (Recomendado para páginas de la universidad que rechazan conexión)"
+              title="Abrir en Ventana Paralela / Emergente (Recomendado para páginas de la universidad)"
             >
               <AppWindow className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="hidden md:inline text-[11px]">Ventana Paralela</span>
+              <span className="hidden lg:inline text-[11px]">Ventana Paralela</span>
             </button>
 
             {/* Botón Copiar Enlace */}
@@ -420,17 +450,6 @@ export const ActivityWorkspaceModal = ({
             >
               {isFullscreenViewer ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
             </button>
-
-            <a
-              href={originalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 text-blue-400 hover:text-blue-300 rounded-lg hover:bg-slate-800 transition flex items-center gap-1 text-xs font-bold"
-              title="Abrir en pestaña externa completa"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Abrir ↗</span>
-            </a>
 
             <button
               onClick={() => setActiveResource(null)}
@@ -526,40 +545,60 @@ export const ActivityWorkspaceModal = ({
             <div className="w-full h-full flex flex-col relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900">
               
               {/* Barra informativa y de acciones rápidas para portales universitarios */}
-              <div className="px-3.5 py-2 bg-slate-950/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 flex-shrink-0">
-                <div className="flex items-center space-x-1.5 min-w-0">
-                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                  <span className="text-[11px] text-slate-300 truncate">
-                    Si el portal de la universidad rechaza la conexión integrada (<span className="font-mono text-amber-300">X-Frame-Options</span>):
-                  </span>
+              <div className="px-3.5 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-xs text-slate-300 flex-shrink-0">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <div className="p-1 rounded-lg bg-amber-500/20 text-amber-400 flex-shrink-0">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white truncate">
+                      ¿La página rechaza la conexión?
+                    </p>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      El sitio web de la universidad no permite abrirse dentro de la app por seguridad.
+                    </p>
+                  </div>
                 </div>
                 
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Botón que explica la restricción */}
                   <button
-                    onClick={() => handleOpenPopout(originalUrl)}
-                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 transition shadow-2xs cursor-pointer"
-                    title="Abre el portal en una ventana flotante al lado de la app para trabajar en simultáneo"
+                    onClick={() => setShowSecurityExplanation(true)}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer shadow-2xs"
+                    title="Ver explicación de por qué este sitio no se puede abrir en la aplicación"
                   >
-                    <AppWindow className="w-3 h-3" />
-                    <span>Ventana Paralela</span>
+                    <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                    <span>¿Por qué no abre?</span>
                   </button>
 
-                  <a
-                    href={originalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-[11px] flex items-center space-x-1 transition shadow-2xs"
+                  {/* Botón para abrir en el navegador predeterminado */}
+                  <button
+                    onClick={() => handleOpenDefaultBrowser(originalUrl)}
+                    className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs flex items-center space-x-1.5 transition shadow-sm cursor-pointer active:scale-95"
+                    title="Abrir página en el navegador predeterminado"
                   >
-                    <span>Pestaña Completa</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                    <Compass className="w-3.5 h-3.5" />
+                    <span>Abrir en el Navegador Predeterminado</span>
+                    <ExternalLink className="w-3 h-3 ml-0.5" />
+                  </button>
 
+                  {/* Botón Ventana Paralela */}
+                  <button
+                    onClick={() => handleOpenPopout(originalUrl)}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition shadow-2xs cursor-pointer"
+                    title="Abre el portal en una ventana flotante al lado de la app para trabajar en simultáneo"
+                  >
+                    <AppWindow className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="hidden sm:inline">Ventana Paralela</span>
+                  </button>
+
+                  {/* Botón Copiar Enlace */}
                   <button
                     onClick={() => handleCopyLink(originalUrl)}
-                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold text-[11px] flex items-center space-x-1 transition border border-slate-700 cursor-pointer"
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs flex items-center space-x-1 transition border border-slate-700 cursor-pointer"
+                    title="Copiar enlace al portapapeles"
                   >
-                    {copiedLink ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedLink ? 'Copiado' : 'Copiar'}</span>
+                    {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
@@ -1263,6 +1302,112 @@ export const ActivityWorkspaceModal = ({
         </div>
 
       </div>
+
+      {/* Modal Explicativo de Seguridad (Por qué el sitio no permite abrirse aquí) */}
+      {showSecurityExplanation && (
+        <div 
+          className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setShowSecurityExplanation(false)}
+        >
+          <div 
+            className="w-full max-w-lg bg-slate-900 border border-slate-700 text-white rounded-3xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabecera */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white leading-tight">
+                    ¿Por qué el sitio no permite abrirse en la aplicación?
+                  </h3>
+                  <p className="text-xs text-amber-300/90 font-mono mt-0.5">
+                    Restricción de seguridad: X-Frame-Options / CSP
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSecurityExplanation(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Explicación Detallada */}
+            <div className="space-y-3 text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+              <p>
+                Los portales universitarios (como <strong className="text-white">SIASE, Moodle, Nexus, Teams, Blackboard</strong>) y sitios institucionales configuran políticas de protección estrictas en sus servidores.
+              </p>
+              <p>
+                Estas directivas le ordenan a tu navegador web (<strong className="text-white">Chrome, Edge, Safari, Firefox</strong>) <span className="text-rose-300 font-semibold">bloquear la carga dentro de marcos de otras aplicaciones</span> para evitar ataques de suplantación de identidad (<em>Clickjacking</em>) y proteger tus contraseñas y datos personales.
+              </p>
+              <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                <span>Puedes abrir la página directamente en tu navegador predeterminado para iniciar sesión y navegar con normalidad.</span>
+              </div>
+            </div>
+
+            {/* Botones de Acción */}
+            <div className="space-y-2.5 pt-1">
+              {activeResource?.originalUrl && (
+                <>
+                  <button
+                    onClick={() => {
+                      handleOpenDefaultBrowser(activeResource.originalUrl);
+                      setShowSecurityExplanation(false);
+                    }}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-2xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer active:scale-98"
+                  >
+                    <Compass className="w-4 h-4" />
+                    <span>Abrir en el Navegador Predeterminado</span>
+                    <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        handleOpenPopout(activeResource.originalUrl);
+                        setShowSecurityExplanation(false);
+                      }}
+                      className="flex-1 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 border border-slate-700 cursor-pointer"
+                    >
+                      <AppWindow className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>Ventana Paralela</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopyLink(activeResource.originalUrl)}
+                      className="flex-1 py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 border border-slate-700 cursor-pointer"
+                    >
+                      {copiedLink ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-400">Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Copiar Enlace</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <button
+                onClick={() => setShowSecurityExplanation(false)}
+                className="w-full py-2 text-slate-400 hover:text-white text-xs font-medium text-center transition"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
