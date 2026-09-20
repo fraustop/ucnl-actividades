@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   ArrowLeft, 
@@ -897,7 +897,7 @@ export const ActivityWorkspaceModal = ({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex"
+      className="fixed inset-x-0 bottom-0 top-8 z-[79] flex"
       onClick={onClose}
     >
       {/* Backdrop */}
