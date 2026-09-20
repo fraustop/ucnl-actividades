@@ -682,8 +682,8 @@ export function App() {
       {/* Recordatorio destacado de activación de notificaciones */}
       <NotificationActivationReminder />
 
-      {/* Banner de Filtros con Fondo Cromado en 1 Sola Fila Pegado al Encabezado (Oculto cuando ConfigModal está activo) */}
-      <div id="ucnl-main-ribbon" className={configModalOpen ? 'hidden' : 'block'}>
+      {/* Banner de Filtros con Fondo Cromado en 1 Sola Fila Pegado al Encabezado (Oculto cuando ConfigModal o WorkspaceModal está activo) */}
+      <div id="ucnl-main-ribbon" className={(configModalOpen || (workspaceModalOpen && (workspaceActivity || selectedActivity))) ? 'hidden' : 'block'}>
         <ActivityFilters
           searchQuery={searchQuery}
           setSearchQuery={handleSearchQueryChange}
@@ -706,7 +706,7 @@ export function App() {
         />
       </div>
 
-      {/* Vista de Configuración a pantalla completa (a la altura del ribbon) o Contenedor Principal Dividido */}
+      {/* Vista de Configuración a pantalla completa (a la altura del ribbon) o Espacio de Recursos o Contenedor Principal Dividido */}
       {configModalOpen ? (
         <ConfigModal
           isOpen={configModalOpen}
@@ -717,6 +717,22 @@ export function App() {
           onSaveStructure={handleSaveAcademicStructure}
           isAdmin={isAdmin}
           currentUser={currentUser}
+        />
+      ) : (workspaceModalOpen && (workspaceActivity || selectedActivity)) ? (
+        <ActivityWorkspaceModal
+          isOpen={workspaceModalOpen}
+          onClose={handleCloseWorkspace}
+          activity={workspaceActivity || selectedActivity}
+          onEditActivity={(act) => {
+            handleCloseWorkspace();
+            handleEditActivity(act);
+          }}
+          personalStatus={
+            (workspaceActivity || selectedActivity)
+              ? (studentCompletions[(workspaceActivity || selectedActivity).id] || 'pending')
+              : 'pending'
+          }
+          onSetPersonalStatus={handleSetPersonalStatus}
         />
       ) : (
         /* Contenedor Dividido: Área Principal + Panel Lateral Derecho (Empuja el contenido en Desktop) */
@@ -800,25 +816,6 @@ export function App() {
           )}
 
         </div>
-      )}
-
-      {/* Modal de Espacio de Trabajo y Recursos (Visor Multiformato + Comentarios + Carga de Documentos + Enlaces/Videos) */}
-      {workspaceModalOpen && (workspaceActivity || selectedActivity) && (
-        <ActivityWorkspaceModal
-          isOpen={workspaceModalOpen}
-          onClose={handleCloseWorkspace}
-          activity={workspaceActivity || selectedActivity}
-          onEditActivity={(act) => {
-            handleCloseWorkspace();
-            handleEditActivity(act);
-          }}
-          personalStatus={
-            (workspaceActivity || selectedActivity)
-              ? (studentCompletions[(workspaceActivity || selectedActivity).id] || 'pending')
-              : 'pending'
-          }
-          onSetPersonalStatus={handleSetPersonalStatus}
-        />
       )}
 
       {/* Modal Crear / Editar Actividad */}
