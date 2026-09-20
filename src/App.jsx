@@ -634,7 +634,7 @@ export function App() {
       <NotificationActivationReminder />
 
       {/* Banner de Filtros con Fondo Cromado en 1 Sola Fila Pegado al Encabezado (Oculto cuando ConfigModal está activo) */}
-      <div className={configModalOpen ? 'hidden' : 'block'}>
+      <div id="ucnl-main-ribbon" className={configModalOpen ? 'hidden' : 'block'}>
         <ActivityFilters
           searchQuery={searchQuery}
           setSearchQuery={handleSearchQueryChange}

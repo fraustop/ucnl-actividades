@@ -27,6 +27,50 @@ export default function NotificationDrawer({
 }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [topOffset, setTopOffset] = useState(84);
+
+  // Calcular la altura exacta del pie del ribbon para alinear el top del panel
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const updateTopOffset = () => {
+      // 1. Intentar medir el ribbon principal si está visible
+      const ribbonEl = document.getElementById('ucnl-main-ribbon');
+      if (ribbonEl && ribbonEl.offsetParent !== null) {
+        const rect = ribbonEl.getBoundingClientRect();
+        if (rect.bottom > 0) {
+          setTopOffset(rect.bottom);
+          return;
+        }
+      }
+
+      // 2. Si está en ConfigModal, medir la barra superior de pestañas
+      const configTabs = document.getElementById('ucnl-config-tabs-bar');
+      if (configTabs && configTabs.offsetParent !== null) {
+        const rect = configTabs.getBoundingClientRect();
+        if (rect.bottom > 0) {
+          setTopOffset(rect.bottom);
+          return;
+        }
+      }
+
+      // 3. Fallback al encabezado superior
+      const headerEl = document.querySelector('header');
+      if (headerEl) {
+        const rect = headerEl.getBoundingClientRect();
+        setTopOffset(rect.bottom);
+      }
+    };
+
+    updateTopOffset();
+    const frameId = requestAnimationFrame(updateTopOffset);
+    window.addEventListener('resize', updateTopOffset);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', updateTopOffset);
+    };
+  }, [isOpen]);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -225,16 +269,18 @@ export default function NotificationDrawer({
 
   return (
     <>
-      {/* Fondo oscuro semitransparente que cubre cualquier modal o vista */}
+      {/* Fondo oscuro semitransparente que cubre cualquier vista bajo el ribbon */}
       <div 
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-[9998] animate-in fade-in duration-200"
+        className="fixed inset-x-0 bottom-0 bg-slate-950/50 backdrop-blur-xs z-[70] animate-in fade-in duration-200"
+        style={{ top: `${topOffset}px` }}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel Lateral Flotante por encima de todo */}
+      {/* Panel Lateral Flotante por encima de todo pero comenzando al pie del ribbon */}
       <aside 
-        className="fixed inset-y-0 right-0 z-[9999] w-full sm:max-w-md md:max-w-lg bg-slate-900 text-slate-100 border-l border-slate-800 shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200 ease-out"
+        className="fixed right-0 bottom-0 z-[75] w-full sm:max-w-md md:max-w-lg bg-slate-900 text-slate-100 border-l border-t border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 ease-out"
+        style={{ top: `${topOffset}px`, height: `calc(100vh - ${topOffset}px)` }}
         role="dialog"
         aria-label="Panel de Notificaciones"
       >
