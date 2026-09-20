@@ -39,6 +39,12 @@ import {
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { compareActivitiesByDueDate } from './utils/dateUtils';
+import { 
+  getInitialNavigationState, 
+  saveNavigationState, 
+  DEFAULT_NAV_STATE, 
+  hashToNavState 
+} from './services/navigationService';
 
 import Navbar from './components/Navbar';
 import AuthModal from './components/AuthModal';
@@ -60,6 +66,9 @@ import NotificationDrawer from './components/NotificationDrawer';
 export function App() {
   const { currentUser, isEditor, isAdmin, isStudent, loading: authLoading } = useAuth();
 
+  // Estado Inicial Restaurado desde localStorage o URL Hash
+  const initialNav = getInitialNavigationState();
+
   // Estado de Datos (Sincronizado IndexedDB + Firestore Meta)
   const [activities, setActivities] = useState([]);
   const [academicStructure, setAcademicStructure] = useState([]);
@@ -68,22 +77,24 @@ export function App() {
   const [firebaseError, setFirebaseError] = useState(null);
   const [syncStatus, setSyncStatus] = useState({ isCached: true, stats: null });
 
-  // Estados de Filtros y Vistas
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTetra, setSelectedTetra] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('pending');
-  const [viewMode, setViewMode] = useState('kanban'); // 'kanban', 'list', 'calendar'
+  // Estados de Filtros y Vistas (Persistidos en localStorage y URL)
+  const [searchQuery, setSearchQuery] = useState(initialNav.searchQuery || '');
+  const [selectedTetra, setSelectedTetra] = useState(initialNav.selectedTetra || 'all');
+  const [selectedSubject, setSelectedSubject] = useState(initialNav.selectedSubject || 'all');
+  const [selectedStatus, setSelectedStatus] = useState(initialNav.selectedStatus || 'pending');
+  const [viewMode, setViewMode] = useState(initialNav.viewMode || 'kanban'); // 'kanban', 'list', 'calendar'
 
-  // Estados de Modales
+  // Estados de Modales y Paneles (Sincronizados con el Historial del Navegador)
   const [authModalState, setAuthModalState] = useState({ isOpen: false, mode: 'login', message: '' });
-  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [activityModalOpen, setActivityModalOpen] = useState(initialNav.modal === 'new_activity');
   const [activityToEdit, setActivityToEdit] = useState(null);
   const [selectedActivity, setSelectedActivity] = useState(null);
-  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [configModalOpen, setConfigModalOpen] = useState(false);
-  const [resourcesModalOpen, setResourcesModalOpen] = useState(false);
-  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [selectedActivityId, setSelectedActivityId] = useState(initialNav.activityId || null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(initialNav.modal === 'activity_details');
+  const [configModalOpen, setConfigModalOpen] = useState(initialNav.modal === 'config');
+  const [configModalTab, setConfigModalTab] = useState(initialNav.configTab || 'tetras');
+  const [resourcesModalOpen, setResourcesModalOpen] = useState(initialNav.modal === 'resources');
+  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(initialNav.modal === 'notifications');
 
   const handleSelectActivityFromNotification = (activityId) => {
     const found = activities.find(a => a.id === activityId);
@@ -259,6 +270,100 @@ export function App() {
     return () => unsubscribe();
   }, [currentUser, isAdmin]);
 
+  // Sincronizar actividad seleccionada si se abrió desde el historial o enlace directo
+  useEffect(() => {
+    if (selectedActivityId && activities.length > 0 && !selectedActivity) {
+      const found = activities.find(a => a.id === selectedActivityId);
+      if (found) {
+        setSelectedActivity(found);
+        setDetailsModalOpen(true);
+      }
+    }
+  }, [activities, selectedActivityId, selectedActivity]);
+
+  // Función unificada para persistir y sincronizar el estado de navegación
+  const syncNav = (override = {}, pushHistory = true) => {
+    const currentNav = {
+      viewMode: override.viewMode !== undefined ? override.viewMode : viewMode,
+      selectedTetra: override.selectedTetra !== undefined ? override.selectedTetra : selectedTetra,
+      selectedSubject: override.selectedSubject !== undefined ? override.selectedSubject : selectedSubject,
+      selectedStatus: override.selectedStatus !== undefined ? override.selectedStatus : selectedStatus,
+      searchQuery: override.searchQuery !== undefined ? override.searchQuery : searchQuery,
+      modal: override.modal !== undefined ? override.modal : (
+        configModalOpen ? 'config' :
+        resourcesModalOpen ? 'resources' :
+        notificationDrawerOpen ? 'notifications' :
+        activityModalOpen ? 'new_activity' :
+        detailsModalOpen ? 'activity_details' : null
+      ),
+      activityId: override.activityId !== undefined ? override.activityId : (detailsModalOpen ? (selectedActivity?.id || selectedActivityId) : null),
+      configTab: override.configTab !== undefined ? override.configTab : configModalTab
+    };
+
+    saveNavigationState(currentNav, pushHistory);
+  };
+
+  // Sincronización bidireccional con el Historial del Navegador (Botones Atrás / Adelante y Gestos Nativos)
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const nav = event.state || hashToNavState(window.location.hash) || DEFAULT_NAV_STATE;
+
+      setViewMode(nav.viewMode || 'kanban');
+      setSelectedTetra(nav.selectedTetra || 'all');
+      setSelectedSubject(nav.selectedSubject || 'all');
+      setSelectedStatus(nav.selectedStatus || 'pending');
+      setSearchQuery(nav.searchQuery || '');
+
+      if (nav.modal === 'config') {
+        setConfigModalOpen(true);
+        setConfigModalTab(nav.configTab || 'tetras');
+        setResourcesModalOpen(false);
+        setNotificationDrawerOpen(false);
+        setActivityModalOpen(false);
+        setDetailsModalOpen(false);
+      } else if (nav.modal === 'resources') {
+        setResourcesModalOpen(true);
+        setConfigModalOpen(false);
+        setNotificationDrawerOpen(false);
+        setActivityModalOpen(false);
+        setDetailsModalOpen(false);
+      } else if (nav.modal === 'notifications') {
+        setNotificationDrawerOpen(true);
+        setConfigModalOpen(false);
+        setResourcesModalOpen(false);
+        setActivityModalOpen(false);
+        setDetailsModalOpen(false);
+      } else if (nav.modal === 'new_activity') {
+        setActivityModalOpen(true);
+        setConfigModalOpen(false);
+        setResourcesModalOpen(false);
+        setNotificationDrawerOpen(false);
+        setDetailsModalOpen(false);
+      } else if (nav.modal === 'activity_details' && nav.activityId) {
+        setSelectedActivityId(nav.activityId);
+        const found = activities.find(a => a.id === nav.activityId);
+        if (found) setSelectedActivity(found);
+        setDetailsModalOpen(true);
+        setConfigModalOpen(false);
+        setResourcesModalOpen(false);
+        setNotificationDrawerOpen(false);
+        setActivityModalOpen(false);
+      } else {
+        setConfigModalOpen(false);
+        setResourcesModalOpen(false);
+        setNotificationDrawerOpen(false);
+        setActivityModalOpen(false);
+        setDetailsModalOpen(false);
+        setSelectedActivity(null);
+        setSelectedActivityId(null);
+      }
+
+      saveNavigationState(nav, false);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activities]);
 
   const handleSetPersonalStatus = async (activityId, status) => {
     if (!currentUser) return;
@@ -289,26 +394,112 @@ export function App() {
     setAuthModalState({ isOpen: true, mode, message });
   };
 
-  // Abrir Modal de Creación / Edición (Solo Admin)
+  // Handlers de Navegación y Modales con Historial
   const handleOpenNewActivity = (presetDate = null) => {
     if (!isAdmin) return;
     setActivityToEdit(presetDate ? { dueDate: presetDate.toISOString() } : null);
     setActivityModalOpen(true);
+    syncNav({ modal: 'new_activity' }, true);
+  };
+
+  const handleCloseActivityModal = () => {
+    setActivityModalOpen(false);
+    setActivityToEdit(null);
+    syncNav({ modal: null }, true);
   };
 
   const handleEditActivity = (activity) => {
     if (!isEditor) return;
     setActivityToEdit(activity);
     setActivityModalOpen(true);
+    syncNav({ modal: 'new_activity' }, true);
   };
 
   const handleViewDetails = (activity) => {
     setSelectedActivity(activity);
+    setSelectedActivityId(activity.id);
     setDetailsModalOpen(true);
+    setConfigModalOpen(false);
+    setResourcesModalOpen(false);
+    setNotificationDrawerOpen(false);
+    syncNav({ modal: 'activity_details', activityId: activity.id }, true);
   };
 
-  const handleOpenConfig = () => {
+  const handleCloseDetails = () => {
+    setDetailsModalOpen(false);
+    setSelectedActivity(null);
+    setSelectedActivityId(null);
+    syncNav({ modal: null, activityId: null }, true);
+  };
+
+  const handleOpenConfig = (tab = 'tetras') => {
     setConfigModalOpen(true);
+    setConfigModalTab(tab);
+    setDetailsModalOpen(false);
+    setResourcesModalOpen(false);
+    setNotificationDrawerOpen(false);
+    syncNav({ modal: 'config', configTab: tab }, true);
+  };
+
+  const handleCloseConfig = () => {
+    setConfigModalOpen(false);
+    syncNav({ modal: null }, true);
+  };
+
+  const handleConfigTabChange = (tab) => {
+    setConfigModalTab(tab);
+    syncNav({ modal: 'config', configTab: tab }, false);
+  };
+
+  const handleOpenResources = () => {
+    setResourcesModalOpen(true);
+    setConfigModalOpen(false);
+    setDetailsModalOpen(false);
+    setNotificationDrawerOpen(false);
+    syncNav({ modal: 'resources' }, true);
+  };
+
+  const handleCloseResources = () => {
+    setResourcesModalOpen(false);
+    syncNav({ modal: null }, true);
+  };
+
+  const handleOpenNotificationDrawer = () => {
+    setNotificationDrawerOpen(true);
+    setConfigModalOpen(false);
+    setDetailsModalOpen(false);
+    setResourcesModalOpen(false);
+    syncNav({ modal: 'notifications' }, true);
+  };
+
+  const handleCloseNotificationDrawer = () => {
+    setNotificationDrawerOpen(false);
+    syncNav({ modal: null }, true);
+  };
+
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
+    syncNav({ viewMode: mode }, true);
+  };
+
+  const handleSearchQueryChange = (q) => {
+    setSearchQuery(q);
+    syncNav({ searchQuery: q }, false);
+  };
+
+  const handleTetraChange = (tetra) => {
+    setSelectedTetra(tetra);
+    syncNav({ selectedTetra: tetra }, false);
+  };
+
+  const handleSubjectChange = (subject) => {
+    setSelectedSubject(subject);
+    syncNav({ selectedSubject: subject }, false);
+  };
+
+  const handleStatusChangeFilter = (status) => {
+    setSelectedStatus(status);
+    syncNav({ selectedStatus: status }, false);
   };
 
   // Operaciones CRUD con sincronización delta (Docentes y Admins)
@@ -333,7 +524,7 @@ export function App() {
       await deleteActivityWithSync(activity);
       setActivities(prev => prev.filter(a => a.id !== activity.id));
       if (detailsModalOpen && selectedActivity?.id === activity.id) {
-        setDetailsModalOpen(false);
+        handleCloseDetails();
       }
     } catch (err) {
       console.error('Error al eliminar actividad:', err);
@@ -404,6 +595,12 @@ export function App() {
     setSelectedTetra('all');
     setSelectedSubject('all');
     setSelectedStatus('pending');
+    syncNav({
+      searchQuery: '',
+      selectedTetra: 'all',
+      selectedSubject: 'all',
+      selectedStatus: 'pending'
+    }, false);
   };
 
   // --- CANCELACIÓN TOTAL DE USO ANÓNIMO ---
@@ -428,9 +625,9 @@ export function App() {
       {/* Barra de Navegación Principal (Estilo Barra de Título Windows) */}
       <Navbar 
         onOpenAuthModal={handleOpenAuth} 
-        onOpenConfigModal={handleOpenConfig}
-        onOpenResourcesModal={() => setResourcesModalOpen(true)}
-        onOpenNotificationDrawer={() => setNotificationDrawerOpen(true)}
+        onOpenConfigModal={() => handleOpenConfig('tetras')}
+        onOpenResourcesModal={handleOpenResources}
+        onOpenNotificationDrawer={handleOpenNotificationDrawer}
       />
 
       {/* Recordatorio destacado de activación de notificaciones */}
@@ -440,23 +637,23 @@ export function App() {
       <div className={configModalOpen ? 'hidden' : 'block'}>
         <ActivityFilters
           searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
+          setSearchQuery={handleSearchQueryChange}
           selectedTetra={selectedTetra}
-          setSelectedTetra={setSelectedTetra}
+          setSelectedTetra={handleTetraChange}
           selectedSubject={selectedSubject}
-          setSelectedSubject={setSelectedSubject}
+          setSelectedSubject={handleSubjectChange}
           selectedStatus={selectedStatus}
-          setSelectedStatus={setSelectedStatus}
+          setSelectedStatus={handleStatusChangeFilter}
           viewMode={viewMode}
-          setViewMode={setViewMode}
+          setViewMode={handleViewModeChange}
           academicStructure={academicStructure}
           onResetFilters={handleResetFilters}
           hasActiveFilters={hasActiveFilters}
           onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
-          onOpenConfigModal={handleOpenConfig}
-          onOpenResourcesModal={() => setResourcesModalOpen(true)}
+          onOpenConfigModal={() => handleOpenConfig('tetras')}
+          onOpenResourcesModal={handleOpenResources}
           onOpenAuthModal={handleOpenAuth}
-          onOpenNotificationDrawer={() => setNotificationDrawerOpen(true)}
+          onOpenNotificationDrawer={handleOpenNotificationDrawer}
         />
       </div>
 
@@ -464,7 +661,9 @@ export function App() {
       {configModalOpen ? (
         <ConfigModal
           isOpen={configModalOpen}
-          onClose={() => setConfigModalOpen(false)}
+          onClose={handleCloseConfig}
+          initialTab={configModalTab}
+          onTabChange={handleConfigTabChange}
           academicStructure={academicStructure}
           onSaveStructure={handleSaveAcademicStructure}
           isAdmin={isAdmin}
@@ -540,10 +739,7 @@ export function App() {
           {detailsModalOpen && selectedActivity && (
             <ActivityDetailsModal
               isOpen={detailsModalOpen}
-              onClose={() => {
-                setDetailsModalOpen(false);
-                setSelectedActivity(null);
-              }}
+              onClose={handleCloseDetails}
               activity={selectedActivity}
               onEdit={handleEditActivity}
               onDelete={handleDeleteActivity}
@@ -560,10 +756,7 @@ export function App() {
       {activityModalOpen && (
         <ActivityModal
           isOpen={activityModalOpen}
-          onClose={() => {
-            setActivityModalOpen(false);
-            setActivityToEdit(null);
-          }}
+          onClose={handleCloseActivityModal}
           onSave={handleSaveActivity}
           activityToEdit={activityToEdit}
           academicStructure={academicStructure}
@@ -574,7 +767,7 @@ export function App() {
       {resourcesModalOpen && (
         <ResourcesModal
           isOpen={resourcesModalOpen}
-          onClose={() => setResourcesModalOpen(false)}
+          onClose={handleCloseResources}
           isAdmin={isAdmin}
           isEditor={isEditor}
           currentUser={currentUser}
@@ -595,7 +788,7 @@ export function App() {
       {notificationDrawerOpen && (
         <NotificationDrawer
           isOpen={notificationDrawerOpen}
-          onClose={() => setNotificationDrawerOpen(false)}
+          onClose={handleCloseNotificationDrawer}
           onSelectActivity={handleSelectActivityFromNotification}
         />
       )}

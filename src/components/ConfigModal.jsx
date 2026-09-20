@@ -64,9 +64,23 @@ export const ConfigModal = ({
   academicStructure = [],
   onSaveStructure,
   isAdmin = false,
-  currentUser = null
+  currentUser = null,
+  initialTab = 'tetras',
+  onTabChange = null
 }) => {
-  const [activeTab, setActiveTab] = useState('tetras'); // 'tetras' | 'subjects' | 'users' | 'notifications'
+  const [activeTab, setActiveTab] = useState(initialTab || 'tetras');
+
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    if (onTabChange) onTabChange(tab);
+  };
+
   const [tetras, setTetras] = useState([]);
   const [selectedTetraId, setSelectedTetraId] = useState('');
   
@@ -546,7 +560,7 @@ export const ConfigModal = ({
           {/* Pestañas de Navegación */}
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll flex-1 min-w-0 py-0.5">
             <button
-              onClick={() => setActiveTab('tetras')}
+              onClick={() => handleSelectTab('tetras')}
               className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeTab === 'tetras'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-400/40'
@@ -558,7 +572,7 @@ export const ConfigModal = ({
             </button>
 
             <button
-              onClick={() => setActiveTab('subjects')}
+              onClick={() => handleSelectTab('subjects')}
               className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeTab === 'subjects'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-400/40'
@@ -572,7 +586,7 @@ export const ConfigModal = ({
             {/* Pestaña Exclusiva de Administradores */}
             {isAdmin ? (
               <button
-                onClick={() => setActiveTab('users')}
+                onClick={() => handleSelectTab('users')}
                 className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                   activeTab === 'users'
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/40'
@@ -595,7 +609,7 @@ export const ConfigModal = ({
 
             {/* Pestaña 4: Notificaciones y Horarios */}
             <button
-              onClick={() => setActiveTab('notifications')}
+              onClick={() => handleSelectTab('notifications')}
               className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeTab === 'notifications'
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-400/40'
@@ -622,10 +636,10 @@ export const ConfigModal = ({
         </div>
 
         {/* Contenido de Pestañas */}
-        <div className={`flex-1 min-h-0 w-full mx-auto ${
+        <div className={`flex-1 min-h-0 w-full ${
           activeTab === 'users' 
-            ? 'flex flex-col overflow-hidden p-3 sm:p-5 lg:p-6 space-y-3 max-w-7xl' 
-            : 'overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl touch-scroll text-sm'
+            ? 'flex flex-col overflow-hidden px-3 sm:px-6 pt-2 pb-3 space-y-2.5' 
+            : 'overflow-y-auto px-3 sm:px-6 pt-3 pb-6 space-y-5 touch-scroll text-sm'
         }`}>
           {error && (
             <div className="flex items-center space-x-2 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
@@ -1757,8 +1771,8 @@ export const ConfigModal = ({
         </div>
 
         {/* Pie del modal con botón Guardar */}
-        <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
-          <div className="max-w-7xl w-full mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="px-3 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+          <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3">
             <span className="text-xs text-slate-500 text-center sm:text-left">
               {savedSuccess ? (
                 <span className="text-emerald-600 font-bold flex items-center space-x-1">
