@@ -184,31 +184,46 @@ export const hashToNavState = (hash = '') => {
  * Carga el estado inicial de navegación desde el URL Hash o localStorage
  */
 export const getInitialNavigationState = () => {
-  // 1. Intentar desde URL Hash (útil para enlaces directos compartidos o marcadores)
-  if (typeof window !== 'undefined' && window.location.hash) {
-    const fromHash = hashToNavState(window.location.hash);
-    if (fromHash) {
-      saveNavigationState(fromHash, false);
-      return fromHash;
-    }
-  }
-
-  // 2. Intentar desde localStorage (para reanudar exactamente donde el usuario lo dejó)
+  // 1. Cargar estado base desde localStorage si existe
+  let savedState = {};
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_NAV_KEY);
     if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        ...DEFAULT_NAV_STATE,
-        ...parsed,
-        timestamp: parsed.timestamp || Date.now()
-      };
+      savedState = JSON.parse(saved) || {};
     }
   } catch (err) {
     console.warn('Error al leer ucnl_navigation_state de localStorage:', err);
   }
 
-  return { ...DEFAULT_NAV_STATE };
+  // 2. Si hay hash en la URL, parsearlo
+  let hashState = null;
+  if (typeof window !== 'undefined' && window.location.hash) {
+    hashState = hashToNavState(window.location.hash);
+  }
+
+  // 3. Fusionar: DEFAULT_NAV_STATE + savedState + hashState (hash tiene prioridad si es una ruta específica)
+  const merged = {
+    ...DEFAULT_NAV_STATE,
+    ...savedState,
+    ...(hashState || {}),
+    timestamp: Date.now()
+  };
+
+  // Preservar selecciones recordadas del usuario si el hash actual no las especifica
+  if (!hashState?.workspaceMode && savedState?.workspaceMode) {
+    merged.workspaceMode = savedState.workspaceMode;
+  }
+  if (!hashState?.tetraId && savedState?.tetraId) {
+    merged.tetraId = savedState.tetraId;
+  }
+  if (!hashState?.subjectId && savedState?.subjectId) {
+    merged.subjectId = savedState.subjectId;
+  }
+  if (!hashState?.activityId && savedState?.activityId) {
+    merged.activityId = savedState.activityId;
+  }
+
+  return merged;
 };
 
 /**
@@ -217,11 +232,27 @@ export const getInitialNavigationState = () => {
 export const saveNavigationState = (state, pushToHistory = false) => {
   if (!state) return;
 
+  // Leer estado existente para no perder selecciones de workspace previas
+  let existingState = {};
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_NAV_KEY);
+    if (saved) {
+      existingState = JSON.parse(saved) || {};
+    }
+  } catch (_) {}
+
   const fullState = {
     ...DEFAULT_NAV_STATE,
+    ...existingState,
     ...state,
     timestamp: Date.now()
   };
+
+  // Mantener selecciones previas de workspace si en state vienen vacías o es cierre de modal
+  if (state.workspaceMode) fullState.workspaceMode = state.workspaceMode;
+  if (state.tetraId) fullState.tetraId = state.tetraId;
+  if (state.subjectId) fullState.subjectId = state.subjectId;
+  if (state.activityId) fullState.activityId = state.activityId;
 
   try {
     localStorage.setItem(LOCAL_STORAGE_NAV_KEY, JSON.stringify(fullState));

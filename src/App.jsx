@@ -103,12 +103,13 @@ export function App() {
   const [workspaceModalOpen, setWorkspaceModalOpen] = useState(
     initialNav.modal === 'workspace' || initialNav.modal === 'resources' || initialNav.modal === 'subject_resources'
   );
-  const [workspaceActivity, setWorkspaceActivity] = useState(null);
   const [workspaceMode, setWorkspaceMode] = useState(
-    initialNav.modal === 'subject_resources' ? 'subject' : 'activity'
+    initialNav.workspaceMode || (initialNav.modal === 'subject_resources' ? 'subject' : 'activity')
   );
   const [workspaceTetraId, setWorkspaceTetraId] = useState(initialNav.tetraId || null);
   const [workspaceSubjectId, setWorkspaceSubjectId] = useState(initialNav.subjectId || null);
+  const [workspaceActivityId, setWorkspaceActivityId] = useState(initialNav.activityId || null);
+  const [workspaceActivity, setWorkspaceActivity] = useState(null);
   const [configModalOpen, setConfigModalOpen] = useState(initialNav.modal === 'config');
   const [configModalTab, setConfigModalTab] = useState(initialNav.configTab || 'tetras');
   const [resourcesModalOpen, setResourcesModalOpen] = useState(false);
@@ -314,27 +315,44 @@ export function App() {
     return () => unsubscribe();
   }, [currentUser, isAdmin]);
 
-  // Sincronizar actividad seleccionada si se abrió desde el historial o enlace directo
+  // Sincronizar actividad seleccionada (para detalles o workspace) cuando cargan las actividades
   useEffect(() => {
-    if (selectedActivityId && activities.length > 0 && !selectedActivity) {
-      const found = activities.find(a => a.id === selectedActivityId);
-      if (found) {
-        setSelectedActivity(found);
-        if (initialNav.modal === 'workspace') {
-          setWorkspaceActivity(found);
-          setWorkspaceModalOpen(true);
-        } else {
-          setDetailsModalOpen(true);
+    if (activities && activities.length > 0) {
+      const targetActId = workspaceActivityId || selectedActivityId || initialNav.activityId;
+      if (targetActId) {
+        const found = activities.find(a => a.id === targetActId);
+        if (found) {
+          if (!selectedActivity) setSelectedActivity(found);
+          if (!workspaceActivity) setWorkspaceActivity(found);
+        }
+      } else if (!workspaceActivity && activities.length > 0) {
+        setWorkspaceActivity(activities[0]);
+        setWorkspaceActivityId(activities[0].id);
+      }
+    }
+  }, [activities, workspaceActivityId, selectedActivityId]);
+
+  // Sincronizar tetra y materia seleccionada del workspace cuando carga la estructura académica
+  useEffect(() => {
+    if (academicStructure && academicStructure.length > 0) {
+      let targetTetra = academicStructure.find(t => t.id === workspaceTetraId);
+      if (!targetTetra) {
+        targetTetra = academicStructure[0];
+        setWorkspaceTetraId(targetTetra?.id || null);
+      }
+      if (targetTetra?.subjects?.length > 0) {
+        const targetSub = targetTetra.subjects.find(s => s.id === workspaceSubjectId);
+        if (!targetSub) {
+          setWorkspaceSubjectId(targetTetra.subjects[0]?.id || null);
         }
       }
     }
-  }, [activities, selectedActivityId, selectedActivity]);
+  }, [academicStructure, workspaceTetraId, workspaceSubjectId]);
 
   // Función unificada para persistir y sincronizar el estado de navegación
   const syncNav = (override = {}, pushHistory = true) => {
     const actId = override.activityId !== undefined ? override.activityId : (
-      workspaceModalOpen ? (workspaceActivity?.id || selectedActivity?.id || selectedActivityId) :
-      detailsModalOpen ? (selectedActivity?.id || selectedActivityId) : null
+      workspaceActivity?.id || workspaceActivityId || selectedActivity?.id || selectedActivityId || null
     );
     const actObj = override.activity !== undefined ? override.activity : (
       (actId && activities.find(a => a.id === actId)) || workspaceActivity || selectedActivity || null
@@ -395,22 +413,17 @@ export function App() {
         setDetailsModalOpen(false);
         setWorkspaceModalOpen(false);
       } else if (nav.modal === 'workspace' || nav.modal === 'subject_resources' || nav.modal === 'resources') {
-        if (nav.workspaceMode === 'subject' || nav.modal === 'subject_resources' || nav.subjectId || nav.tetraId) {
-          setWorkspaceTetraId(nav.tetraId || null);
-          setWorkspaceSubjectId(nav.subjectId || null);
-          setWorkspaceMode('subject');
-          setWorkspaceActivity(null);
-        } else if (nav.activityId) {
-          setSelectedActivityId(nav.activityId);
+        const targetMode = (nav.workspaceMode === 'subject' || nav.modal === 'subject_resources') ? 'subject' : 'activity';
+        setWorkspaceMode(targetMode);
+        if (nav.tetraId) setWorkspaceTetraId(nav.tetraId);
+        if (nav.subjectId) setWorkspaceSubjectId(nav.subjectId);
+        if (nav.activityId) {
+          setWorkspaceActivityId(nav.activityId);
           const found = activities.find(a => a.id === nav.activityId);
           if (found) {
             setSelectedActivity(found);
             setWorkspaceActivity(found);
           }
-          setWorkspaceMode('activity');
-        } else {
-          setWorkspaceActivity(null);
-          setWorkspaceMode('activity');
         }
         setWorkspaceModalOpen(true);
         setConfigModalOpen(false);
@@ -569,12 +582,20 @@ export function App() {
     syncNav({ modal: null }, true);
   };
 
-  const handleOpenWorkspace = (activity = null, mode = 'activity', tetraId = null, subjectId = null) => {
-    const act = activity || (mode === 'activity' ? selectedActivity : null);
-    setWorkspaceActivity(act || null);
-    setWorkspaceMode(mode || (act ? 'activity' : 'activity'));
-    if (tetraId) setWorkspaceTetraId(tetraId);
-    if (subjectId) setWorkspaceSubjectId(subjectId);
+  const handleOpenWorkspace = (activity = null, mode = null, tetraId = null, subjectId = null) => {
+    const targetMode = mode || (activity ? 'activity' : (workspaceMode || 'activity'));
+    const targetActivity = activity || workspaceActivity || (activities.length > 0 ? activities[0] : null);
+    const targetTetraId = tetraId || workspaceTetraId;
+    const targetSubjectId = subjectId || workspaceSubjectId;
+
+    setWorkspaceMode(targetMode);
+    if (targetActivity) {
+      setWorkspaceActivity(targetActivity);
+      setWorkspaceActivityId(targetActivity.id);
+    }
+    if (targetTetraId) setWorkspaceTetraId(targetTetraId);
+    if (targetSubjectId) setWorkspaceSubjectId(targetSubjectId);
+
     setWorkspaceModalOpen(true);
     setConfigModalOpen(false);
     setDetailsModalOpen(false);
@@ -582,22 +603,28 @@ export function App() {
     setResourcesModalOpen(false);
     setActivityModalOpen(false);
 
-    if (mode === 'subject') {
-      syncNav({ modal: 'subject_resources', tetraId: tetraId || null, subjectId: subjectId || null }, true);
-    } else if (act?.id) {
-      syncNav({ modal: 'workspace', activityId: act.id }, true);
-    } else {
-      syncNav({ modal: 'resources', activityId: null }, true);
-    }
+    syncNav({
+      modal: 'workspace',
+      workspaceMode: targetMode,
+      activityId: targetActivity?.id || workspaceActivityId || null,
+      activity: targetActivity || null,
+      tetraId: targetTetraId || null,
+      subjectId: targetSubjectId || null
+    }, true);
   };
 
   const handleCloseWorkspace = () => {
     setWorkspaceModalOpen(false);
-    setWorkspaceActivity(null);
     if (detailsModalOpen && selectedActivity) {
       syncNav({ modal: 'activity_details', activityId: selectedActivity.id }, true);
     } else {
-      syncNav({ modal: null, activityId: null, tetraId: null, subjectId: null }, true);
+      syncNav({
+        modal: null,
+        workspaceMode,
+        tetraId: workspaceTetraId,
+        subjectId: workspaceSubjectId,
+        activityId: workspaceActivityId || workspaceActivity?.id || null
+      }, true);
     }
   };
 
@@ -919,6 +946,7 @@ export function App() {
           activity={workspaceActivity}
           onSelectActivity={(act) => {
             setWorkspaceActivity(act);
+            setWorkspaceActivityId(act?.id || null);
             syncNav({ modal: 'workspace', workspaceMode: 'activity', activityId: act?.id, activity: act }, false);
           }}
           activities={activities}

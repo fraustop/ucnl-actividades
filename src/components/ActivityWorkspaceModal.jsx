@@ -159,6 +159,17 @@ export const ActivityWorkspaceModal = ({
     }
   }, [activity]);
 
+  // Si no hay actividad seleccionada en modo actividad, auto-seleccionar la primera disponible
+  useEffect(() => {
+    if (isOpen && workspaceMode === 'activity' && !currentActivity && activities && activities.length > 0) {
+      const defaultAct = activities[0];
+      setCurrentActivity(defaultAct);
+      if (onSelectActivity) {
+        onSelectActivity(defaultAct);
+      }
+    }
+  }, [isOpen, workspaceMode, currentActivity, activities, onSelectActivity]);
+
   useEffect(() => {
     if (initialTetraId) {
       setSelectedTetraId(initialTetraId);
@@ -171,13 +182,26 @@ export const ActivityWorkspaceModal = ({
     }
   }, [initialSubjectId]);
 
+  // Auto-seleccionar primer tetra y primera materia si faltan o si se abre en modo materia
   useEffect(() => {
-    if (academicStructure && academicStructure.length > 0) {
-      if (!selectedTetraId) {
-        setSelectedTetraId(academicStructure[0]?.id || '');
+    if (isOpen && academicStructure && academicStructure.length > 0) {
+      let tetra = academicStructure.find(t => t.id === selectedTetraId);
+      if (!tetra) {
+        tetra = academicStructure[0];
+        setSelectedTetraId(tetra.id);
+      }
+      if (tetra?.subjects?.length > 0) {
+        const subExists = tetra.subjects.some(s => s.id === selectedSubjectId);
+        if (!subExists || !selectedSubjectId) {
+          const firstSub = tetra.subjects[0];
+          setSelectedSubjectId(firstSub.id);
+          if (onSelectSubject && tetra.id && firstSub.id) {
+            onSelectSubject(tetra.id, firstSub.id);
+          }
+        }
       }
     }
-  }, [academicStructure, selectedTetraId]);
+  }, [isOpen, academicStructure, selectedTetraId, selectedSubjectId, onSelectSubject]);
 
   // SuscripciÃƒÂ³n en tiempo real a los recursos de la materia
   useEffect(() => {
@@ -244,6 +268,22 @@ export const ActivityWorkspaceModal = ({
       setActiveTab('viewer');
     }
   }, [isOpen, workspaceMode, currentActivity?.id]);
+
+  // Cargar automáticamente el primer recurso al cambiar de materia en modo subject
+  useEffect(() => {
+    if (!isOpen || workspaceMode !== 'subject' || !subjectData) {
+      return;
+    }
+    setUseGoogleDocsFallback(false);
+
+    if (subjectData.attachments && subjectData.attachments.length > 0) {
+      const firstAtt = subjectData.attachments[0];
+      setActiveResource(getEmbedInfo(firstAtt.downloadUrl, firstAtt.name));
+    } else if (subjectData.links && subjectData.links.length > 0) {
+      const firstLink = subjectData.links[0];
+      setActiveResource(getEmbedInfo(firstLink.url, firstLink.title));
+    }
+  }, [isOpen, workspaceMode, selectedSubjectId, subjectData]);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -974,7 +1014,13 @@ export const ActivityWorkspaceModal = ({
               <button type="button"
                 onClick={() => { 
                   setWorkspaceMode('activity'); 
-                  if (onModeChange) onModeChange('activity'); 
+                  if (onModeChange) onModeChange('activity');
+                  if (!currentActivity && activities && activities.length > 0) {
+                    setCurrentActivity(activities[0]);
+                    if (onSelectActivity) onSelectActivity(activities[0]);
+                  } else if (currentActivity && onSelectActivity) {
+                    onSelectActivity(currentActivity);
+                  }
                 }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${workspaceMode === 'activity' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
                 <FileText className="w-3.5 h-3.5" /><span>Por Actividad</span>
@@ -983,7 +1029,10 @@ export const ActivityWorkspaceModal = ({
               <button type="button"
                 onClick={() => { 
                   setWorkspaceMode('subject'); 
-                  if (onModeChange) onModeChange('subject'); 
+                  if (onModeChange) onModeChange('subject');
+                  if (selectedTetraId && selectedSubjectId && onSelectSubject) {
+                    onSelectSubject(selectedTetraId, selectedSubjectId);
+                  }
                 }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${workspaceMode === 'subject' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
                 <BookOpen className="w-3.5 h-3.5" /><span>Por Materia</span>
