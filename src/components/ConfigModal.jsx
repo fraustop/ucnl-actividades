@@ -494,98 +494,85 @@ export const ConfigModal = ({
         className="bg-white flex-1 flex flex-col overflow-hidden w-full h-full border-t border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Cabecera */}
-        <div className="px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 border-b border-slate-200 bg-white flex items-center justify-between flex-shrink-0 shadow-xs">
-          <div className="flex items-center space-x-2.5 sm:space-x-3.5">
-            <div className="p-2 sm:p-2.5 bg-gradient-to-tr from-blue-700 to-indigo-600 text-white rounded-2xl shadow-sm shadow-blue-500/20 flex-shrink-0">
-              <Settings className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 flex items-center gap-2">
-                <span>Panel de Configuración</span>
-                {isAdmin && (
-                  <span className="text-[10px] sm:text-[11px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-200 flex-shrink-0">
-                    Admin
-                  </span>
-                )}
-              </h2>
-              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1">
-                Estructura académica de Tetras, Materias, Gestión de Usuarios y Notificaciones.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl transition shadow-xs"
-            title="Cerrar panel (Esc)"
-          >
-            <X className="w-4 h-4" />
-            <span className="hidden sm:inline">Cerrar</span>
-          </button>
-        </div>
-
-        {/* Pestañas con scroll suave en móvil */}
-        <div className="flex border-b border-slate-200 bg-slate-50 px-4 sm:px-6 lg:px-8 pt-2.5 gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll flex-shrink-0">
-          <button
-            onClick={() => setActiveTab('tetras')}
-            className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
-              activeTab === 'tetras'
-                ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
-                : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>1. Tetras ({tetras.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('subjects')}
-            className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
-              activeTab === 'subjects'
-                ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
-                : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>2. Materias</span>
-          </button>
-
-          {/* Pestaña Exclusiva de Administradores */}
-          {isAdmin ? (
+        {/* Barra Superior: Pestañas de Navegación a la izquierda y Botón Cerrar a la derecha */}
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100/90 px-3 sm:px-6 pt-2 gap-2 flex-shrink-0">
+          
+          {/* Pestañas de Navegación */}
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll flex-1 min-w-0">
             <button
-              onClick={() => setActiveTab('users')}
+              onClick={() => setActiveTab('tetras')}
               className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
-                activeTab === 'users'
-                  ? 'bg-white text-indigo-700 border-slate-200 shadow-xs'
-                  : 'bg-transparent text-slate-600 border-transparent hover:text-indigo-900'
+                activeTab === 'tetras'
+                  ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
+                  : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
               }`}
             >
-              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
-              <span>3. Usuarios ({usersList.length})</span>
-              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+              <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>1. Tetras ({tetras.length})</span>
             </button>
-          ) : (
-            <div 
-              className="flex items-center space-x-1.5 px-3 py-2 text-[11px] sm:text-xs text-slate-400 cursor-not-allowed opacity-60 whitespace-nowrap"
-              title="Solo disponible para el administrador"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>3. Usuarios</span>
-            </div>
-          )}
 
-          {/* Pestaña 4: Notificaciones y Horarios */}
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
-              activeTab === 'notifications'
-                ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
-                : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
-            }`}
-          >
-            <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
-            <span>4. Notificaciones</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('subjects')}
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
+                activeTab === 'subjects'
+                  ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
+                  : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>2. Materias</span>
+            </button>
+
+            {/* Pestaña Exclusiva de Administradores */}
+            {isAdmin ? (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
+                  activeTab === 'users'
+                    ? 'bg-white text-indigo-700 border-slate-200 shadow-xs'
+                    : 'bg-transparent text-slate-600 border-transparent hover:text-indigo-900'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
+                <span>3. Usuarios ({usersList.length})</span>
+                <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+              </button>
+            ) : (
+              <div 
+                className="flex items-center space-x-1.5 px-3 py-2 text-[11px] sm:text-xs text-slate-400 cursor-not-allowed opacity-60 whitespace-nowrap"
+                title="Solo disponible para el administrador"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>3. Usuarios</span>
+              </div>
+            )}
+
+            {/* Pestaña 4: Notificaciones y Horarios */}
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
+                activeTab === 'notifications'
+                  ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
+                  : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
+              }`}
+            >
+              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+              <span>4. Notificaciones</span>
+            </button>
+          </div>
+
+          {/* Botón Cerrar a la derecha */}
+          <div className="pb-1.5 pl-2 flex-shrink-0">
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 active:scale-95 rounded-xl transition shadow-xs cursor-pointer"
+              title="Cerrar configuración (Esc)"
+            >
+              <X className="w-4 h-4 text-slate-500" />
+              <span className="hidden sm:inline">Cerrar</span>
+            </button>
+          </div>
+
         </div>
 
         {/* Contenido de Pestañas */}
