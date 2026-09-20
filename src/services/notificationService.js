@@ -278,14 +278,47 @@ export const notifyNewActivityLocal = async (activity) => {
     return;
   }
 
-  const title = `📚 Nueva Actividad: ${activity.subject || 'Materia'}`;
-  const body = `${activity.title}${activity.tetraName ? ` (${activity.tetraName})` : ''} - Fecha límite: ${activity.dueDate ? activity.dueDate.replace('T', ' ') : 'Por definir'}`;
+  const isMeeting = activity.type === 'reunion' || activity.type === 'clase_virtual';
+  const icon = isMeeting ? '📅' : '📚';
+  const prefix = isMeeting ? 'Nueva Reunión / Sesión' : 'Nueva Actividad';
+  const title = `${icon} ${prefix}: ${activity.subject || 'Materia'}`;
+  const body = `${activity.title}${activity.tetraName ? ` (${activity.tetraName})` : ''} - Fecha: ${activity.dueDate ? activity.dueDate.replace('T', ' ') : 'Por definir'}`;
 
   await emitLocalNotification(title, {
     body,
     tag: `new_act_${activity.id || Date.now()}`,
     data: { activityId: activity.id, url: '/' }
   });
+};
+
+/**
+ * Notifica vía push a los usuarios cuando un docente o admin crea una nueva actividad o reunión
+ */
+export const notifyNewActivityPush = async (activity) => {
+  if (!activity) return;
+
+  const isMeeting = activity.type === 'reunion' || activity.type === 'clase_virtual';
+  const icon = isMeeting ? '📅' : '📚';
+  const prefix = isMeeting ? 'Nueva Reunión / Sesión' : 'Nueva Actividad';
+  const title = `${icon} ${prefix}: ${activity.subject || 'Materia'}`;
+  const body = `${activity.title}${activity.tetraName ? ` (${activity.tetraName})` : ''} - Fecha: ${activity.dueDate ? activity.dueDate.replace('T', ' ') : 'Por definir'}`;
+
+  try {
+    const backendUrl = getBackendUrl();
+    await fetch(`${backendUrl}/api/notify/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        body,
+        role: 'all',
+        url: '/'
+      }),
+      signal: AbortSignal.timeout(6000)
+    }).catch(() => {});
+  } catch (e) {
+    console.debug('Aviso push backend nueva actividad:', e);
+  }
 };
 
 /**

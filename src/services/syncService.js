@@ -28,6 +28,7 @@ import {
   deleteFromStore 
 } from './indexedDbService';
 import { deleteAttachmentFromStorage } from './storageService';
+import { notifyNewActivityPush } from './notificationService';
 
 const META_DATA_REF = doc(db, 'metadata', 'data');
 const META_SYNC_REF = doc(db, 'metadata', 'sync_meta');
@@ -296,6 +297,11 @@ export const createActivityWithSync = async (activityData, user) => {
 
   // 4. Guardar de inmediato en IndexedDB local
   await putInStore(STORES.ACTIVITIES, createdActivity);
+
+  // 5. Notificar push a los estudiantes sobre la nueva actividad o reunión
+  notifyNewActivityPush(createdActivity).catch(err => {
+    console.debug('Aviso notificación push nueva actividad:', err);
+  });
 
   return createdActivity;
 };

@@ -32,7 +32,6 @@ import {
 import confetti from 'canvas-confetti';
 import { 
   onForegroundMessage,
-  checkAndTriggerLocalDueReminders,
   notifyNewActivityLocal,
   emitLocalNotification
 } from './services/notificationService';
@@ -217,13 +216,6 @@ export function App() {
     return () => unsubscribe();
   }, [currentUser]);
 
-  // 3. Comprobar recordatorios locales de vencimiento (al abrir la app, 1 sola vez al día por dispositivo)
-  useEffect(() => {
-    if (!currentUser || !completionsLoaded || activities.length === 0) return;
-
-    // Comprobación al cargar actividades y completados (controlado por localStorage para no repetir en el mismo día)
-    checkAndTriggerLocalDueReminders(activities, studentCompletions, isStudent, false);
-  }, [currentUser, completionsLoaded, activities, studentCompletions, isStudent]);
 
   // 4. Escuchar notificaciones en primer plano
   useEffect(() => {
