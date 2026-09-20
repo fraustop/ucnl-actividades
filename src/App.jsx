@@ -413,132 +413,134 @@ export function App() {
       {/* Recordatorio destacado de activación de notificaciones */}
       <NotificationActivationReminder />
 
-      {/* Banner de Filtros con Fondo Cromado en 1 Sola Fila Pegado al Encabezado */}
-      <ActivityFilters
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        selectedTetra={selectedTetra}
-        setSelectedTetra={setSelectedTetra}
-        selectedSubject={selectedSubject}
-        setSelectedSubject={setSelectedSubject}
-        selectedStatus={selectedStatus}
-        setSelectedStatus={setSelectedStatus}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        academicStructure={academicStructure}
-        onResetFilters={handleResetFilters}
-        hasActiveFilters={hasActiveFilters}
-        onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
-        onOpenConfigModal={handleOpenConfig}
-        onOpenResourcesModal={() => setResourcesModalOpen(true)}
-        onOpenAuthModal={handleOpenAuth}
-        onOpenNotificationDrawer={() => setNotificationDrawerOpen(true)}
-      />
+      {/* Banner de Filtros con Fondo Cromado en 1 Sola Fila Pegado al Encabezado (Oculto cuando ConfigModal está activo) */}
+      <div className={configModalOpen ? 'hidden' : 'block'}>
+        <ActivityFilters
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          selectedTetra={selectedTetra}
+          setSelectedTetra={setSelectedTetra}
+          selectedSubject={selectedSubject}
+          setSelectedSubject={setSelectedSubject}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          academicStructure={academicStructure}
+          onResetFilters={handleResetFilters}
+          hasActiveFilters={hasActiveFilters}
+          onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
+          onOpenConfigModal={handleOpenConfig}
+          onOpenResourcesModal={() => setResourcesModalOpen(true)}
+          onOpenAuthModal={handleOpenAuth}
+          onOpenNotificationDrawer={() => setNotificationDrawerOpen(true)}
+        />
+      </div>
 
-      {/* Contenedor Dividido: Área Principal + Panel Lateral Derecho (Empuja el contenido en Desktop) */}
-      <div className="flex-1 flex flex-row items-stretch w-full overflow-hidden min-h-0 relative">
-        
-        {/* Contenido Principal (Kanban / Lista / Calendario) */}
-        <main className="flex-1 min-w-0 px-3 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col h-full overflow-hidden min-h-0 transition-all duration-300">
+      {/* Vista de Configuración a pantalla completa (a la altura del ribbon) o Contenedor Principal Dividido */}
+      {configModalOpen ? (
+        <ConfigModal
+          isOpen={configModalOpen}
+          onClose={() => setConfigModalOpen(false)}
+          academicStructure={academicStructure}
+          onSaveStructure={handleSaveAcademicStructure}
+          isAdmin={isAdmin}
+          currentUser={currentUser}
+        />
+      ) : (
+        /* Contenedor Dividido: Área Principal + Panel Lateral Derecho (Empuja el contenido en Desktop) */
+        <div className="flex-1 flex flex-row items-stretch w-full overflow-hidden min-h-0 relative">
           
-          {/* Banner de Diagnóstico / Firebase si ocurre un error */}
-          {firebaseError && (
-            <FirebaseStatusBanner 
-              error={firebaseError} 
-              onDismiss={() => setFirebaseError(null)} 
+          {/* Contenido Principal (Kanban / Lista / Calendario) */}
+          <main className="flex-1 min-w-0 px-3 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col h-full overflow-hidden min-h-0 transition-all duration-300">
+            
+            {/* Banner de Diagnóstico / Firebase si ocurre un error */}
+            {firebaseError && (
+              <FirebaseStatusBanner 
+                error={firebaseError} 
+                onDismiss={() => setFirebaseError(null)} 
+              />
+            )}
+
+            {/* Vistas Principales */}
+            {loading ? (
+              <div className="h-64 flex flex-col items-center justify-center space-y-3">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <p className="text-sm font-semibold text-slate-500">Cargando actividades escolares desde IndexedDB / Firebase...</p>
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 h-full flex flex-col overflow-hidden">
+                {viewMode === 'kanban' && (
+                  <KanbanView
+                    activities={searchAndStructureFilteredActivities}
+                    selectedStatus={selectedStatus}
+                    onViewDetails={handleViewDetails}
+                    onEdit={handleEditActivity}
+                    onDelete={handleDeleteActivity}
+                    onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
+                    studentCompletions={studentCompletions}
+                    onToggleStudentCompletion={handleToggleStudentCompletion}
+                    onSetPersonalStatus={handleSetPersonalStatus}
+                    selectedActivity={selectedActivity}
+                  />
+                )}
+
+                {viewMode === 'list' && (
+                  <ListView
+                    activities={filteredActivities}
+                    onViewDetails={handleViewDetails}
+                    onEdit={handleEditActivity}
+                    onDelete={handleDeleteActivity}
+                    onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
+                    studentCompletions={studentCompletions}
+                    onToggleStudentCompletion={handleToggleStudentCompletion}
+                    onSetPersonalStatus={handleSetPersonalStatus}
+                    selectedActivity={selectedActivity}
+                  />
+                )}
+
+                {viewMode === 'calendar' && (
+                  <CalendarView
+                    activities={filteredActivities}
+                    onViewDetails={handleViewDetails}
+                    onOpenNewActivity={isAdmin ? (date) => handleOpenNewActivity(date) : null}
+                    studentCompletions={studentCompletions}
+                    selectedActivity={selectedActivity}
+                  />
+                )}
+              </div>
+            )}
+
+          </main>
+
+          {/* Panel Lateral Derecho de Actividad: En Desktop empuja el contenido y topa debajo del ribbon. En móvil ocupa toda la pantalla */}
+          {detailsModalOpen && selectedActivity && (
+            <ActivityDetailsModal
+              isOpen={detailsModalOpen}
+              onClose={() => {
+                setDetailsModalOpen(false);
+                setSelectedActivity(null);
+              }}
+              activity={selectedActivity}
+              onEdit={handleEditActivity}
+              onDelete={handleDeleteActivity}
+              personalStatus={selectedActivity ? (studentCompletions[selectedActivity.id] || 'pending') : 'pending'}
+              onSetPersonalStatus={handleSetPersonalStatus}
+              onToggleStudentCompletion={handleToggleStudentCompletion}
             />
           )}
 
-          {/* Vistas Principales */}
-          {loading ? (
-            <div className="h-64 flex flex-col items-center justify-center space-y-3">
-              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-              <p className="text-sm font-semibold text-slate-500">Cargando actividades escolares desde IndexedDB / Firebase...</p>
-            </div>
-          ) : (
-            <div className="flex-1 min-h-0 h-full flex flex-col overflow-hidden">
-              {viewMode === 'kanban' && (
-                <KanbanView
-                  activities={searchAndStructureFilteredActivities}
-                  selectedStatus={selectedStatus}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditActivity}
-                  onDelete={handleDeleteActivity}
-                  onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
-                  studentCompletions={studentCompletions}
-                  onToggleStudentCompletion={handleToggleStudentCompletion}
-                  onSetPersonalStatus={handleSetPersonalStatus}
-                  selectedActivity={selectedActivity}
-                />
-              )}
-
-              {viewMode === 'list' && (
-                <ListView
-                  activities={filteredActivities}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditActivity}
-                  onDelete={handleDeleteActivity}
-                  onOpenNewActivity={isAdmin ? () => handleOpenNewActivity() : null}
-                  studentCompletions={studentCompletions}
-                  onToggleStudentCompletion={handleToggleStudentCompletion}
-                  onSetPersonalStatus={handleSetPersonalStatus}
-                  selectedActivity={selectedActivity}
-                />
-              )}
-
-              {viewMode === 'calendar' && (
-                <CalendarView
-                  activities={filteredActivities}
-                  onViewDetails={handleViewDetails}
-                  onOpenNewActivity={isAdmin ? (date) => handleOpenNewActivity(date) : null}
-                  studentCompletions={studentCompletions}
-                  selectedActivity={selectedActivity}
-                />
-              )}
-            </div>
+          {/* Panel de Notificaciones: En Desktop topa exactamente debajo del ribbon. En móvil ocupa toda la pantalla */}
+          {notificationDrawerOpen && (
+            <NotificationDrawer
+              isOpen={notificationDrawerOpen}
+              onClose={() => setNotificationDrawerOpen(false)}
+              onSelectActivity={handleSelectActivityFromNotification}
+            />
           )}
 
-        </main>
-
-        {/* Panel Lateral Derecho de Actividad: En Desktop empuja el contenido y topa debajo del ribbon. En móvil ocupa toda la pantalla */}
-        {detailsModalOpen && selectedActivity && (
-          <ActivityDetailsModal
-            isOpen={detailsModalOpen}
-            onClose={() => {
-              setDetailsModalOpen(false);
-              setSelectedActivity(null);
-            }}
-            activity={selectedActivity}
-            onEdit={handleEditActivity}
-            onDelete={handleDeleteActivity}
-            personalStatus={selectedActivity ? (studentCompletions[selectedActivity.id] || 'pending') : 'pending'}
-            onSetPersonalStatus={handleSetPersonalStatus}
-            onToggleStudentCompletion={handleToggleStudentCompletion}
-          />
-        )}
-
-        {/* Panel de Notificaciones: En Desktop topa exactamente debajo del ribbon. En móvil ocupa toda la pantalla */}
-        {notificationDrawerOpen && (
-          <NotificationDrawer
-            isOpen={notificationDrawerOpen}
-            onClose={() => setNotificationDrawerOpen(false)}
-            onSelectActivity={handleSelectActivityFromNotification}
-          />
-        )}
-
-        {/* Modal / Panel de Configuración: Ocupa todo el espacio disponible debajo del ribbon */}
-        {configModalOpen && (
-          <ConfigModal
-            isOpen={configModalOpen}
-            onClose={() => setConfigModalOpen(false)}
-            academicStructure={academicStructure}
-            onSaveStructure={handleSaveAcademicStructure}
-            isAdmin={isAdmin}
-            currentUser={currentUser}
-          />
-        )}
-
-      </div>
+        </div>
+      )}
 
       {/* Modal Crear / Editar Actividad */}
       {activityModalOpen && (

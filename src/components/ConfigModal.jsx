@@ -489,37 +489,37 @@ export const ConfigModal = ({
   }, [onClose]);
 
   return (
-    <div className="absolute inset-0 z-40 bg-slate-100/95 flex flex-col overflow-hidden animate-in fade-in duration-150">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0 w-full h-full bg-slate-100 animate-in fade-in duration-150">
       <div 
-        className="bg-white flex-1 flex flex-col overflow-hidden w-full h-full border-t border-slate-200"
+        className="bg-white flex-1 flex flex-col overflow-hidden w-full h-full"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Barra Superior: Pestañas de Navegación a la izquierda y Botón Cerrar a la derecha */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100/90 px-3 sm:px-6 pt-2 gap-2 flex-shrink-0">
+        {/* Barra Superior: Pestañas con degradado azul oscuro y Botón Cerrar Rojo */}
+        <div className="flex items-center justify-between bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 border-b border-blue-900/60 px-3 sm:px-6 py-2 gap-2 flex-shrink-0 sticky top-0 z-30 shadow-md shadow-blue-950/25">
           
           {/* Pestañas de Navegación */}
-          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar touch-scroll flex-1 min-w-0 py-0.5">
             <button
               onClick={() => setActiveTab('tetras')}
-              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeTab === 'tetras'
-                  ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
-                  : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-400/40'
+                  : 'bg-white/5 text-slate-300 border border-white/5 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Layers className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'tetras' ? 'text-white' : 'text-blue-300'}`} />
               <span>1. Tetras ({tetras.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('subjects')}
-              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeTab === 'subjects'
-                  ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
-                  : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-400/40'
+                  : 'bg-white/5 text-slate-300 border border-white/5 hover:text-white hover:bg-white/10'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <BookOpen className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'subjects' ? 'text-white' : 'text-blue-300'}`} />
               <span>2. Materias</span>
             </button>
 
@@ -527,19 +527,19 @@ export const ConfigModal = ({
             {isAdmin ? (
               <button
                 onClick={() => setActiveTab('users')}
-                className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                   activeTab === 'users'
-                    ? 'bg-white text-indigo-700 border-slate-200 shadow-xs'
-                    : 'bg-transparent text-slate-600 border-transparent hover:text-indigo-900'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/40'
+                    : 'bg-white/5 text-indigo-200 border border-white/5 hover:text-white hover:bg-indigo-900/40'
                 }`}
               >
-                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
+                <Users className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'users' ? 'text-white' : 'text-indigo-300'}`} />
                 <span>3. Usuarios ({usersList.length})</span>
-                <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               </button>
             ) : (
               <div 
-                className="flex items-center space-x-1.5 px-3 py-2 text-[11px] sm:text-xs text-slate-400 cursor-not-allowed opacity-60 whitespace-nowrap"
+                className="flex items-center space-x-1.5 px-3 py-1.5 text-xs text-slate-500 cursor-not-allowed opacity-50 whitespace-nowrap bg-white/5 rounded-xl border border-white/5"
                 title="Solo disponible para el administrador"
               >
                 <Lock className="w-3.5 h-3.5" />
@@ -550,26 +550,26 @@ export const ConfigModal = ({
             {/* Pestaña 4: Notificaciones y Horarios */}
             <button
               onClick={() => setActiveTab('notifications')}
-              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-t-2xl text-[11px] sm:text-xs font-bold transition border-t border-x whitespace-nowrap ${
+              className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeTab === 'notifications'
-                  ? 'bg-white text-blue-700 border-slate-200 shadow-xs'
-                  : 'bg-transparent text-slate-600 border-transparent hover:text-slate-900'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border border-blue-400/40'
+                  : 'bg-white/5 text-slate-300 border border-white/5 hover:text-white hover:bg-white/10'
               }`}
             >
-              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+              <Bell className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${activeTab === 'notifications' ? 'text-white' : 'text-blue-300'}`} />
               <span>4. Notificaciones</span>
             </button>
           </div>
 
-          {/* Botón Cerrar a la derecha */}
-          <div className="pb-1.5 pl-2 flex-shrink-0">
+          {/* Botón Cerrar Rojo a la derecha (Sin etiqueta) */}
+          <div className="flex-shrink-0 pl-1">
             <button
               onClick={onClose}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 active:scale-95 rounded-xl transition shadow-xs cursor-pointer"
+              className="p-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white border border-rose-500/50 rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center min-w-[36px] min-h-[36px]"
               title="Cerrar configuración (Esc)"
+              aria-label="Cerrar configuración"
             >
-              <X className="w-4 h-4 text-slate-500" />
-              <span className="hidden sm:inline">Cerrar</span>
+              <X className="w-4 h-4 text-white stroke-[2.5]" />
             </button>
           </div>
 
