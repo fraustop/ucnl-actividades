@@ -157,54 +157,52 @@ export default function NotificationDrawer({
           onClick={() => handleClickItem(item)}
           className={`group relative p-3.5 rounded-2xl border transition text-left cursor-pointer ${
             !item.isRead
-              ? 'bg-slate-800/90 border-blue-500/40 hover:border-blue-400 shadow-md shadow-blue-950/30'
-              : 'bg-slate-800/40 border-slate-700/40 hover:bg-slate-800/70 hover:border-slate-600'
+              ? 'bg-slate-800 border-blue-500 hover:border-blue-400 shadow-md shadow-blue-950/40'
+              : 'bg-slate-800/90 border-slate-700 hover:bg-slate-800 hover:border-slate-500'
           }`}
         >
           {!item.isRead && (
-            <span className="absolute top-3.5 right-3.5 w-2 h-2 rounded-full bg-blue-500 shadow-xs shadow-blue-400" />
+            <span className="absolute top-3.5 right-3.5 w-2.5 h-2.5 rounded-full bg-blue-400 shadow-sm shadow-blue-400 animate-pulse" />
           )}
 
           <div className="flex items-start space-x-3 pr-4">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm ${
               item.type === 'due' || item.title?.includes('Urgente') || item.title?.includes('Vencida')
-                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                ? 'bg-rose-600 text-white border border-rose-400'
                 : item.title?.includes('7 días') || item.type === 'daily_7days_reminder'
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                ? 'bg-emerald-600 text-white border border-emerald-400'
                 : item.title?.includes('Nueva')
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                ? 'bg-blue-600 text-white border border-blue-400'
+                : 'bg-indigo-600 text-white border border-indigo-400'
             }`}>
               {item.type === 'due' || item.title?.includes('Urgente') ? (
-                <AlertCircle className="w-4 h-4" />
+                <AlertCircle className="w-4 h-4 text-white" />
               ) : item.title?.includes('7 días') || item.type === 'daily_7days_reminder' ? (
-                <Calendar className="w-4 h-4" />
+                <Calendar className="w-4 h-4 text-white" />
               ) : (
-                <BookOpen className="w-4 h-4" />
+                <BookOpen className="w-4 h-4 text-white" />
               )}
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className={`text-xs sm:text-sm font-bold leading-tight ${
-                !item.isRead ? 'text-white' : 'text-slate-300'
-              }`}>
+              <p className="text-xs sm:text-sm font-bold leading-tight text-white">
                 {item.title}
               </p>
 
               {item.body && (
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-200 font-medium mt-1 leading-relaxed">
                   {item.body}
                 </p>
               )}
 
-              <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-                <div className="flex items-center space-x-1">
-                  <Clock className="w-3 h-3" />
+              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-300">
+                <div className="flex items-center space-x-1 font-mono">
+                  <Clock className="w-3 h-3 text-slate-400" />
                   <span>{formatTime(item.timestamp)}</span>
                 </div>
 
                 {hasActivity && (
-                  <span className="inline-flex items-center space-x-0.5 text-blue-400 font-bold hover:underline">
+                  <span className="inline-flex items-center space-x-0.5 text-cyan-300 font-bold hover:underline">
                     <span>Ver tarea</span>
                     <ChevronRight className="w-3 h-3" />
                   </span>
@@ -215,7 +213,7 @@ export default function NotificationDrawer({
 
           <button
             onClick={(e) => handleDeleteItem(e, item.id)}
-            className="absolute bottom-2 right-2 p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-700/60 opacity-0 group-hover:opacity-100 transition"
+            className="absolute bottom-2 right-2 p-1.5 rounded-lg text-slate-300 hover:text-rose-400 hover:bg-slate-700 opacity-0 group-hover:opacity-100 transition cursor-pointer"
             title="Eliminar notificación"
           >
             <Trash2 className="w-3.5 h-3.5" />

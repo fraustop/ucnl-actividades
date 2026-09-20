@@ -83,29 +83,29 @@ export const InAppNotificationBanner = () => {
         return (
           <div
             key={notif.id}
-            className="pointer-events-auto bg-slate-900/98 backdrop-blur-xl text-white border-2 border-blue-500 shadow-2xl rounded-2xl p-4 flex flex-col space-y-3 animate-in slide-in-from-top-6 fade-in duration-300 transition-all hover:border-blue-400"
+            className="pointer-events-auto bg-slate-950 text-white border-2 border-blue-500 shadow-2xl rounded-2xl p-4 flex flex-col space-y-3 animate-in slide-in-from-top-6 fade-in duration-300 transition-all hover:border-blue-400 ring-1 ring-blue-400/30"
           >
             <div className="flex items-start space-x-3.5">
-              <div className="p-2.5 bg-blue-600/30 text-blue-400 rounded-xl border border-blue-500/30 flex-shrink-0 mt-0.5 animate-bounce">
-                <BellRing className="w-5 h-5" />
+              <div className="p-2.5 bg-blue-600 text-white rounded-xl border border-blue-400 flex-shrink-0 mt-0.5 shadow-md shadow-blue-950">
+                <BellRing className="w-5 h-5 animate-pulse" />
               </div>
 
               <div className="flex-1 min-w-0 pr-1">
-                <div className="flex items-center space-x-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-200 bg-blue-900 px-2 py-0.5 rounded-md border border-blue-400">
                     UCNL Alerta
                   </span>
                   {isConfirmReq && (
-                    <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-500/30">
+                    <span className="text-[10px] font-bold text-amber-200 bg-amber-950 px-2 py-0.5 rounded-md border border-amber-400">
                       Acción requerida
                     </span>
                   )}
                 </div>
-                <h4 className="font-bold text-sm text-white mt-1 leading-snug break-words">
+                <h4 className="font-bold text-sm sm:text-base text-white mt-1.5 leading-snug break-words">
                   {notif.title}
                 </h4>
                 {notif.body && (
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed break-words">
+                  <p className="text-xs sm:text-sm text-slate-100 font-medium mt-1 leading-relaxed break-words">
                     {notif.body}
                   </p>
                 )}
@@ -113,8 +113,9 @@ export const InAppNotificationBanner = () => {
 
               <button
                 onClick={() => handleDismiss(notif.id)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition flex-shrink-0"
-                title="Cerrar"
+                className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition flex-shrink-0 cursor-pointer"
+                title="Cerrar notificación"
+                aria-label="Cerrar notificación"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -122,17 +123,17 @@ export const InAppNotificationBanner = () => {
 
             {/* Botón de Acción para Confirmación */}
             {isConfirmReq && (
-              <div className="pt-1 border-t border-slate-800 flex items-center justify-end">
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-end">
                 {isConfirmed ? (
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 py-1 px-3 bg-emerald-950/60 border border-emerald-700/60 rounded-xl">
-                    <CheckCircle2 className="w-4 h-4" />
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300 py-1.5 px-3 bg-emerald-950 border border-emerald-500 rounded-xl w-full justify-center">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                     <span>¡Confirmado con éxito!</span>
                   </div>
                 ) : (
                   <button
                     onClick={() => handleConfirmAction(notif)}
                     disabled={isLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow-md shadow-emerald-900/40 border border-emerald-400/40"
+                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition shadow-lg shadow-emerald-950 border border-emerald-400 cursor-pointer disabled:opacity-50"
                   >
                     {isLoading ? (
                       <>
