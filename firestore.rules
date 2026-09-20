@@ -2,10 +2,16 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Actividades escolares: requiere autenticación obligatoria
+    // Actividades escolares y sus comentarios / dudas
     match /activities/{activityId} {
       allow read: if request.auth != null;
       allow create, update, delete: if request.auth != null;
+
+      // Subcolección de comentarios y dudas en tiempo real
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create, update, delete: if request.auth != null;
+      }
     }
 
     // Documento de sincronización y metadata de versiones
