@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, 
   ArrowLeft, 
@@ -223,39 +223,118 @@ export const ActivityWorkspaceModal = ({
     return () => unsubscribe();
   }, [isOpen, workspaceMode, currentActivity?.id, currentUser?.uid]);
 
-  // Cargar automÃƒÂ¡ticamente el primer recurso al cambiar de actividad
+  // Seleccionar recurso para el visor integrado con persistencia de último documento abierto
+  const handleSelectResource = useCallback((resource) => {
+    if (!resource) return;
+    setUseGoogleDocsFallback(false);
+    const rawUrl = resource.url || resource.downloadUrl || '';
+    if (!rawUrl) return;
+
+    const correctedUrl = fixCloudinaryUrl(rawUrl, resource.category || resource.type || '');
+    const title = resource.title || resource.name || 'Documento';
+    const info = getEmbedInfo(correctedUrl, title);
+    
+    let googleViewerUrl = null;
+    if (info.type === 'office' || info.type === 'pdf' || info.type === 'web') {
+      googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(correctedUrl)}&embedded=true`;
+    }
+
+    const resObj = {
+      ...info,
+      title: title,
+      name: resource.name || title,
+      category: resource.category || info.type,
+      originalUrl: correctedUrl,
+      downloadUrl: correctedUrl,
+      url: correctedUrl,
+      googleViewerUrl: googleViewerUrl
+    };
+
+    setActiveResource(resObj);
+    setActiveTab('viewer');
+
+    // Persistir el último documento abierto tanto para la actividad/materia como globalmente
+    try {
+      if (workspaceMode === 'activity' && currentActivity?.id) {
+        localStorage.setItem(`ucnl_last_resource_act_${currentActivity.id}`, JSON.stringify(resObj));
+      } else if (workspaceMode === 'subject' && selectedTetraId && selectedSubjectId) {
+        localStorage.setItem(`ucnl_last_resource_subj_${selectedTetraId}_${selectedSubjectId}`, JSON.stringify(resObj));
+      }
+      localStorage.setItem('ucnl_last_active_resource', JSON.stringify({
+        mode: workspaceMode,
+        activityId: currentActivity?.id || null,
+        tetraId: selectedTetraId || null,
+        subjectId: selectedSubjectId || null,
+        resource: resObj
+      }));
+    } catch (err) {
+      console.warn('Error al guardar último documento en localStorage:', err);
+    }
+  }, [workspaceMode, currentActivity?.id, selectedTetraId, selectedSubjectId]);
+
+  // Cargar último recurso guardado o primer recurso disponible al cambiar de actividad
   useEffect(() => {
     if (!isOpen || workspaceMode !== 'activity' || !currentActivity) {
       return;
     }
     setUseGoogleDocsFallback(false);
 
+    // 1. Intentar cargar el último recurso guardado para esta actividad
+    try {
+      const savedKey = `ucnl_last_resource_act_${currentActivity.id}`;
+      const savedRaw = localStorage.getItem(savedKey);
+      if (savedRaw) {
+        const savedRes = JSON.parse(savedRaw);
+        if (savedRes && (savedRes.url || savedRes.downloadUrl)) {
+          handleSelectResource(savedRes);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Si no hay previo, usar el primer link o archivo disponible
     if (currentActivity.links && currentActivity.links.length > 0) {
       const firstLink = currentActivity.links[0];
-      setActiveResource(getEmbedInfo(firstLink.url, firstLink.title));
-      setActiveTab('viewer');
+      handleSelectResource(firstLink);
     } else if (currentActivity.attachments && currentActivity.attachments.length > 0) {
       const firstAtt = currentActivity.attachments[0];
-      setActiveResource(getEmbedInfo(firstAtt.downloadUrl, firstAtt.name));
-      setActiveTab('viewer');
+      handleSelectResource(firstAtt);
+    } else {
+      setActiveResource(null);
     }
-  }, [isOpen, workspaceMode, currentActivity?.id]);
+  }, [isOpen, workspaceMode, currentActivity?.id, handleSelectResource]);
 
-  // Cargar automáticamente el primer recurso al cambiar de materia en modo subject
+  // Cargar último recurso guardado o primer recurso disponible al cambiar de materia en modo subject
   useEffect(() => {
-    if (!isOpen || workspaceMode !== 'subject' || !subjectData) {
+    if (!isOpen || workspaceMode !== 'subject' || !selectedSubjectId || !subjectData) {
       return;
     }
     setUseGoogleDocsFallback(false);
 
+    // 1. Intentar cargar el último recurso guardado para esta materia
+    try {
+      const savedKey = `ucnl_last_resource_subj_${selectedTetraId}_${selectedSubjectId}`;
+      const savedRaw = localStorage.getItem(savedKey);
+      if (savedRaw) {
+        const savedRes = JSON.parse(savedRaw);
+        if (savedRes && (savedRes.url || savedRes.downloadUrl)) {
+          handleSelectResource(savedRes);
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Si no hay previo, usar el primer archivo o enlace disponible
     if (subjectData.attachments && subjectData.attachments.length > 0) {
       const firstAtt = subjectData.attachments[0];
-      setActiveResource(getEmbedInfo(firstAtt.downloadUrl, firstAtt.name));
+      handleSelectResource({ url: firstAtt.downloadUrl, name: firstAtt.name, category: firstAtt.category });
     } else if (subjectData.links && subjectData.links.length > 0) {
       const firstLink = subjectData.links[0];
-      setActiveResource(getEmbedInfo(firstLink.url, firstLink.title));
+      handleSelectResource({ url: firstLink.url, title: firstLink.title });
+    } else {
+      setActiveResource(null);
     }
-  }, [isOpen, workspaceMode, selectedSubjectId, subjectData]);
+  }, [isOpen, workspaceMode, selectedTetraId, selectedSubjectId, subjectData, handleSelectResource]);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -455,27 +534,7 @@ export const ActivityWorkspaceModal = ({
   const attachments = currentActivity?.attachments || [];
   const links = currentActivity?.links || [];
 
-  // Seleccionar recurso para el visor integrado
-  const handleSelectResource = (resource) => {
-    setUseGoogleDocsFallback(false);
-    // Corregir URL de Cloudinary si fue subida con resource_type incorrecto (/image/ en lugar de /raw/)
-    const rawUrl = resource.url || resource.downloadUrl || '';
-    const correctedUrl = fixCloudinaryUrl(rawUrl, resource.category || resource.type || '');
-    const info = getEmbedInfo(correctedUrl, resource.title || resource.name);
-    
-    let googleViewerUrl = null;
-    if (info.type === 'office' || info.type === 'pdf' || info.type === 'web') {
-      googleViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(correctedUrl)}&embedded=true`;
-    }
-
-    setActiveResource({
-      ...info,
-      title: resource.title || resource.name || info.title,
-      originalUrl: correctedUrl,
-      googleViewerUrl: googleViewerUrl
-    });
-    setActiveTab('viewer');
-  };
+  
 
   // Abrir en el navegador predeterminado
   const handleOpenDefaultBrowser = (url) => {
