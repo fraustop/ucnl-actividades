@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 
 // ==========================================
-// MÓDULOS DEL TUTORIAL (EXCLUSIVOS ESTUDIANTES)
+// MÓDULOS DEL TUTORIAL (100% ESTUDIANTES)
 // ==========================================
 export const STUDENT_TUTORIAL_MODULES = [
   {
@@ -50,7 +50,7 @@ export const STUDENT_TUTORIAL_MODULES = [
     icon: ShieldCheck,
     color: 'from-blue-600 to-indigo-600',
     description: 'Inicio de sesión institucional, selector de tetramestre y registro seguro de tu dispositivo.',
-    summary: 'Aprende a ingresar al portal de actividades de la Universidad Ciudadana de Nuevo León, vincular tus dispositivos de forma segura y personalizar tu tetramestre activo.',
+    summary: 'Aprende a ingresar al portal de actividades de la Universidad Ciudadana de Nuevo León, vincular tus dispositivos de forma segura y filtrar únicamente las materias que estás cursando.',
     features: [
       {
         title: 'Inicio de Sesión Seguro',
@@ -266,7 +266,7 @@ const MockupAcceso = () => (
         <div className="w-3 h-3 rounded-full bg-rose-500/80" />
         <div className="w-3 h-3 rounded-full bg-amber-500/80" />
         <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
-        <span className="text-[11px] font-mono text-slate-400 ml-2">portal.ucnl.edu.mx/actividades</span>
+        <span className="text-[11px] font-mono text-slate-400 ml-2">https://ucnl-actividades.web.app</span>
       </div>
       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
         SSL 256-bit Seguro
@@ -283,7 +283,7 @@ const MockupAcceso = () => (
           Bienvenido al Portal Escolar
         </h4>
         <p className="text-xs text-slate-400 leading-relaxed">
-          Ingresa con tu correo universitario para sincronizar tus materias, tareas y recordatorios.
+          Ingresa con tu cuenta institucional para sincronizar tus materias, tareas y recordatorios diarios.
         </p>
         <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
           <div className="flex items-center justify-between text-xs">
@@ -855,10 +855,10 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
   }, [onClose, activeModuleIndex]);
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col font-sans overflow-hidden text-slate-100 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[1000] bg-slate-950 flex flex-col font-sans overflow-hidden text-slate-100 animate-in fade-in duration-200 select-text">
       
-      {/* 1. BARRA SUPERIOR (HEADER) */}
-      <header className="bg-slate-950/90 backdrop-blur-md border-b border-indigo-900/50 px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-shrink-0 z-30 shadow-md">
+      {/* 1. BARRA SUPERIOR (HEADER GLOBAL) */}
+      <header className="bg-slate-950/95 backdrop-blur-md border-b border-indigo-900/50 px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-shrink-0 z-30 shadow-md">
         
         {/* Identidad y Título */}
         <div className="flex items-center space-x-3 min-w-0">
@@ -885,7 +885,7 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-indigo-300" />
           <input
             type="text"
-            placeholder="Buscar función (ej. semáforo, chat)..."
+            placeholder="Buscar tema (ej. semáforo, chat)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-900 border border-indigo-900/60 text-xs text-white placeholder-indigo-300/60 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -908,14 +908,14 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
         </div>
       </header>
 
-      {/* 2. CONTENEDOR PRINCIPAL: SIDEBAR + ÁREA DE CONTENIDO */}
+      {/* 2. CONTENEDOR PRINCIPAL: SIDEBAR + CONTENIDO SCROLLABLE */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 bg-slate-950">
         
         {/* SIDEBAR DE MÓDULOS */}
         <aside className="w-full md:w-80 lg:w-88 bg-slate-950 border-b md:border-b-0 md:border-r border-indigo-950 flex flex-col flex-shrink-0 min-h-0">
           
           {/* Encabezado del Índice */}
-          <div className="p-3.5 px-4 bg-slate-900/60 border-b border-indigo-950 flex items-center justify-between">
+          <div className="p-3.5 px-4 bg-slate-900/80 border-b border-indigo-950 flex items-center justify-between flex-shrink-0">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
               Módulos ({STUDENT_TUTORIAL_MODULES.length})
@@ -925,8 +925,8 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
             </span>
           </div>
 
-          {/* Lista de Módulos */}
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 touch-scroll no-scrollbar">
+          {/* Lista de Módulos (Scrollable) */}
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 touch-scroll">
             {filteredModules.map((mod) => {
               const Icon = mod.icon;
               const index = STUDENT_TUTORIAL_MODULES.findIndex(m => m.id === mod.id);
@@ -962,10 +962,10 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
             })}
           </div>
 
-          {/* Progreso inferior en Sidebar */}
-          <div className="p-3.5 bg-slate-900/80 border-t border-indigo-950 hidden md:block">
+          {/* Barra de Progreso Inferior en Sidebar */}
+          <div className="p-3.5 bg-slate-900/90 border-t border-indigo-950 flex-shrink-0 hidden md:block">
             <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
-              <span>Tu progreso en la guía</span>
+              <span>Tu avance en la guía</span>
               <span className="font-bold text-indigo-300">
                 {Math.round(((activeModuleIndex + 1) / STUDENT_TUTORIAL_MODULES.length) * 100)}%
               </span>
@@ -979,83 +979,86 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
           </div>
         </aside>
 
-        {/* ÁREA CENTRAL DE CONTENIDO */}
-        <main className="flex-1 flex flex-col overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 touch-scroll bg-slate-900/60">
+        {/* ÁREA CENTRAL DE CONTENIDO (BLOQUE NORMAL SCROLLABLE) */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-900/60 min-w-0 touch-scroll">
           
-          {/* BARRA DE NAVEGACIÓN SUPERIOR DEDICADA Y ESPACIOSA */}
-          <div className="bg-slate-950/80 border border-indigo-900/40 rounded-2xl p-3 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3 shadow-md">
+          {/* BARRA DE NAVEGACIÓN Y TÍTULO DEL MÓDULO (HERO CARD COMPLETO Y ESPACIOSO) */}
+          <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 border border-indigo-800/40 rounded-3xl p-5 sm:p-7 shadow-xl shadow-black/40 space-y-5">
             
-            {/* Botón Anterior */}
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={activeModuleIndex === 0}
-              className="px-3.5 sm:px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 disabled:opacity-30 disabled:pointer-events-none text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer border border-slate-800 shadow-sm"
-            >
-              <ArrowLeft className="w-4 h-4 text-indigo-400" />
-              <span className="hidden sm:inline">Anterior</span>
-            </button>
+            {/* Fila 1: Selector de Pasos y Botones Anterior/Siguiente */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-indigo-900/50">
+              
+              {/* Botón Anterior */}
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={activeModuleIndex === 0}
+                className="px-3.5 sm:px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 active:scale-95 disabled:opacity-25 disabled:pointer-events-none text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700/60 shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4 text-indigo-400" />
+                <span>Anterior</span>
+              </button>
 
-            {/* Píldoras de pasos rápidos */}
-            <div className="flex items-center space-x-1.5 sm:space-x-2">
-              {STUDENT_TUTORIAL_MODULES.map((mod, idx) => (
+              {/* Selector de Píldoras Numéricas (1..7) */}
+              <div className="flex items-center space-x-1.5 sm:space-x-2">
+                {STUDENT_TUTORIAL_MODULES.map((mod, idx) => (
+                  <button
+                    key={mod.id}
+                    onClick={() => setActiveModuleIndex(idx)}
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl font-bold text-xs flex items-center justify-center transition cursor-pointer ${
+                      idx === activeModuleIndex
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-400/50 scale-105'
+                        : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+                    }`}
+                    title={mod.title}
+                  >
+                    {mod.number}
+                  </button>
+                ))}
+              </div>
+
+              {/* Botón Siguiente */}
+              {activeModuleIndex < STUDENT_TUTORIAL_MODULES.length - 1 ? (
                 <button
-                  key={mod.id}
-                  onClick={() => setActiveModuleIndex(idx)}
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl font-bold text-xs flex items-center justify-center transition cursor-pointer ${
-                    idx === activeModuleIndex
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-400/50'
-                      : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
-                  }`}
-                  title={mod.title}
+                  type="button"
+                  onClick={handleNext}
+                  className="px-3.5 sm:px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/30 border border-blue-500/40"
                 >
-                  {mod.number}
+                  <span>Siguiente</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
-              ))}
+              ) : (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-emerald-600/30 border border-emerald-500/40"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Finalizar</span>
+                </button>
+              )}
             </div>
 
-            {/* Botón Siguiente */}
-            {activeModuleIndex < STUDENT_TUTORIAL_MODULES.length - 1 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="px-3.5 sm:px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md shadow-blue-600/30 border border-blue-500/40"
-              >
-                <span className="hidden sm:inline">Siguiente</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-600/30 border border-emerald-500/40"
-              >
-                <Check className="w-4 h-4" />
-                <span className="hidden sm:inline">Finalizar</span>
-              </button>
-            )}
-          </div>
-
-          {/* TARJETA DE PRESENTACIÓN DEL MÓDULO */}
-          <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 border border-indigo-800/40 rounded-3xl p-6 sm:p-8 shadow-xl shadow-black/40 relative overflow-hidden space-y-4">
-            <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-            
-            <div className="flex items-start space-x-4">
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-tr ${currentModule.color} flex items-center justify-center text-white shadow-lg flex-shrink-0 border border-white/20`}>
-                {React.createElement(currentModule.icon, { className: 'w-7 h-7' })}
+            {/* Fila 2: Icono, Título y Descripción del Módulo */}
+            <div className="flex items-start space-x-4 sm:space-x-5">
+              <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr ${currentModule.color} flex items-center justify-center text-white shadow-lg shadow-indigo-900/40 flex-shrink-0 border border-white/20 mt-1`}>
+                {React.createElement(currentModule.icon, { className: 'w-7 h-7 sm:w-8 sm:h-8' })}
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
+
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
                     Módulo {currentModule.number} de {STUDENT_TUTORIAL_MODULES.length}
                   </span>
                   <span className="text-slate-600">•</span>
                   <span className="text-xs text-slate-400">Guía del Estudiante UCNL</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
                   {currentModule.title}
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl pt-1">
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl pt-0.5">
                   {currentModule.summary}
                 </p>
               </div>
@@ -1063,14 +1066,14 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
           </div>
 
           {/* CAPTURA DE PANTALLA / MAQUETA INTERACTIVA DE LA APP */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between px-1">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <Monitor className="w-3.5 h-3.5 text-blue-400" />
-                Captura en Vivo / Simulación de la Interfaz
+                <Monitor className="w-4 h-4 text-blue-400" />
+                Vista previa en vivo de la plataforma
               </span>
-              <span className="text-[11px] text-indigo-300">
-                Vista real en plataforma
+              <span className="text-[11px] text-indigo-300 font-medium">
+                Simulación interactiva
               </span>
             </div>
             
@@ -1081,7 +1084,7 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
           <div className="bg-slate-950/80 border border-indigo-950 rounded-3xl p-5 sm:p-7 space-y-4 shadow-md">
             <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-indigo-400" />
-              <span>Cómo utilizar esta función en tus tareas</span>
+              <span>Cómo funciona para ti como estudiante</span>
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
@@ -1110,19 +1113,19 @@ export const AppTutorial = ({ onClose, currentUser = null }) => {
             </div>
           </div>
 
-          {/* TARJETA DE SUGERENCIA / RECORDATORIO DE ACCESO ?tuto */}
+          {/* TARJETA DE ACCESO PERMANENTE ?tuto */}
           <div className="p-4 sm:p-5 bg-gradient-to-r from-indigo-950 via-slate-950 to-blue-950 border border-indigo-800/40 rounded-2xl text-xs text-indigo-200 flex items-start space-x-3 shadow-inner">
             <HelpCircle className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
             <div className="space-y-1 leading-relaxed">
-              <strong className="text-white block font-bold">💡 Acceso permanente a este tutorial</strong>
+              <strong className="text-white block font-bold">💡 Acceso permanente a esta guía</strong>
               <p className="text-indigo-200/90">
-                Puedes volver a abrir este manual interactivo en cualquier momento desde cualquier celular o computadora agregando <code className="bg-slate-900 text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-800">?tuto</code> al final de la dirección web (ejemplo: <code className="bg-slate-900 text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-800">https://ucnl-actividades.web.app/?tuto</code>) sin necesidad de iniciar sesión.
+                Puedes volver a abrir este tutorial en cualquier momento desde cualquier celular o computadora agregando <code className="bg-slate-900 text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-800">?tuto</code> al final de la dirección web (ejemplo: <code className="bg-slate-900 text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold border border-slate-800">https://ucnl-actividades.web.app/?tuto</code>) sin necesidad de iniciar sesión.
               </p>
             </div>
           </div>
 
           {/* BARRA DE NAVEGACIÓN AL FINAL DE LA PÁGINA */}
-          <div className="flex items-center justify-between pt-4 border-t border-indigo-950">
+          <div className="flex items-center justify-between pt-4 pb-2 border-t border-indigo-950">
             <button
               type="button"
               onClick={handlePrev}
