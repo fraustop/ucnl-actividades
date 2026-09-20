@@ -39,6 +39,7 @@ import {
   subscribeToUsers, 
   updateUserRole, 
   updateUserStatus,
+  detectAndMergeDuplicateUsers,
   SUPER_ADMIN_EMAIL 
 } from '../services/userService';
 import {
@@ -108,6 +109,32 @@ export const ConfigModal = ({
   const [creatingUser, setCreatingUser] = useState(false);
   const [userActionSuccess, setUserActionSuccess] = useState('');
   const [userActionError, setUserActionError] = useState('');
+
+  // Estados para Detección y Fusión de Duplicados
+  const [deduplicatingUsers, setDeduplicatingUsers] = useState(false);
+  const [deduplicateResult, setDeduplicateResult] = useState(null);
+  const [deduplicateError, setDeduplicateError] = useState('');
+
+  const handleRunDeduplication = async () => {
+    if (!isAdmin) return;
+    setDeduplicatingUsers(true);
+    setDeduplicateResult(null);
+    setDeduplicateError('');
+
+    try {
+      const result = await detectAndMergeDuplicateUsers();
+      setDeduplicateResult(result);
+      setTimeout(() => {
+        setDeduplicateResult(null);
+      }, 10000);
+    } catch (err) {
+      console.error('Error al fusionar duplicados:', err);
+      setDeduplicateError(err.message || 'Error al procesar la fusión de duplicados.');
+      setTimeout(() => setDeduplicateError(''), 8000);
+    } finally {
+      setDeduplicatingUsers(false);
+    }
+  };
 
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -873,6 +900,71 @@ export const ConfigModal = ({
                   </div>
                 </div>
               </div>
+
+              {/* Herramienta de Detección y Fusión de Duplicados */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-indigo-50/80 border border-indigo-200/90 rounded-2xl shadow-2xs">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-xs">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-indigo-950">
+                      Detector y Fusión de Correos Duplicados
+                    </h4>
+                    <p className="text-[11px] text-indigo-700/80">
+                      Detecta cuentas repetidas con el mismo correo, fusionándolas en el documento más completo y preservando tareas, roles y tokens.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRunDeduplication}
+                  disabled={deduplicatingUsers}
+                  className="inline-flex items-center justify-center space-x-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50 flex-shrink-0 cursor-pointer"
+                >
+                  {deduplicatingUsers ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Analizando y fusionando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Detectar y Fusionar Ahora</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {deduplicateResult && (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 space-y-2 animate-in fade-in">
+                  <div className="flex items-center space-x-2 font-bold text-emerald-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>
+                      {deduplicateResult.mergedUsersCount > 0
+                        ? `¡Fusión completada! Se fusionaron ${deduplicateResult.mergedUsersCount} cuentas duplicadas en ${deduplicateResult.duplicateGroupsCount} correos.`
+                        : '¡Excelente! No se encontraron correos duplicados en la base de datos.'}
+                    </span>
+                  </div>
+                  {deduplicateResult.details && deduplicateResult.details.length > 0 && (
+                    <div className="pl-6 space-y-1 text-[11px] text-emerald-700">
+                      {deduplicateResult.details.map((det, i) => (
+                        <div key={i}>
+                          • <strong>{det.email}</strong> ({det.displayName}): Fusionados {det.mergedCount} duplicados &rarr; ID principal: <code className="bg-emerald-100 px-1 rounded">{det.primaryDocId.substring(0, 8)}...</code> (Tareas: {det.totalCompletions}, Tokens: {det.totalTokens})
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {deduplicateError && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span>{deduplicateError}</span>
+                </div>
+              )}
 
               {/* Formulario de Creación de Usuario */}
               <div className="bg-slate-50 border border-slate-200 p-4 sm:p-5 rounded-2xl space-y-4">
