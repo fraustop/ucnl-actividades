@@ -504,11 +504,12 @@ export const ActivityModal = ({
                 Haz clic o arrastra documentos aquí para subirlos a Firebase
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Archivos PDF, DOCX, XLSX, PPTX, JPG, PNG, ZIP hasta 50MB
+                Archivos PDF, DOCX, XLSX, PPTX, JPG, PNG, WebP, SVG, AVIF, Gráficos y ZIP hasta 50MB
               </p>
               <input
                 type="file"
                 multiple
+                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv,.svg,.webp,.avif"
                 onChange={handleFileUpload}
                 className="hidden"
               />

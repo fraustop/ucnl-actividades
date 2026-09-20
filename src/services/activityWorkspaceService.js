@@ -299,14 +299,40 @@ export const getEmbedInfo = (url = '', title = '') => {
     };
   }
 
-  // 7. Imágenes directas (PNG, JPG, JPEG, GIF, WebP, SVG, BMP, ICO, AVIF)
-  if (/\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)($|\?|#)/i.test(lowerUrl) || (lowerUrl.includes('cloudinary.com') && lowerUrl.includes('/image/upload/'))) {
+  // 7. Imágenes y Gráficos directos (PNG, JPG, JPEG, GIF, WebP, SVG, SVGZ, AVIF, BMP, ICO, TIFF, HEIC, EPS, PSD, etc.)
+  if (
+    /\.(png|jpe?g|gif|webp|svg|svgz|avif|bmp|ico|tiff?|heic|heif|raw|eps|ai|psd|jfif|pjpeg|pjp)($|\?|#)/i.test(lowerUrl) || 
+    (lowerUrl.includes('cloudinary.com') && lowerUrl.includes('/image/upload/'))
+  ) {
+    let imgExt = 'IMG';
+    const extMatch = lowerUrl.match(/\.(png|jpe?g|gif|webp|svg|svgz|avif|bmp|ico|tiff?|heic|heif|raw|eps|ai|psd|jfif|pjpeg|pjp)($|\?|#)/i);
+    if (extMatch) {
+      imgExt = extMatch[1].toUpperCase();
+    } else if (lowerUrl.includes('format=webp')) {
+      imgExt = 'WEBP';
+    } else if (lowerUrl.includes('format=svg')) {
+      imgExt = 'SVG';
+    } else if (lowerUrl.includes('format=avif')) {
+      imgExt = 'AVIF';
+    }
+
+    const platformLabel = imgExt === 'SVG' || imgExt === 'SVGZ' 
+      ? 'Gráfico Vectorial SVG' 
+      : imgExt === 'WEBP' 
+      ? 'Imagen WebP' 
+      : imgExt === 'AVIF' 
+      ? 'Imagen AVIF de Alta Eficiencia' 
+      : imgExt === 'GIF'
+      ? 'Gráfico / Animación GIF'
+      : `Imagen ${imgExt}`;
+
     return {
       type: 'image',
-      platform: 'Imagen',
+      platform: platformLabel,
+      imageFormat: imgExt,
       originalUrl: cleanUrl,
       embedUrl: cleanUrl,
-      title: title || extractedFileName || 'Visualizador de Imagen',
+      title: title || extractedFileName || `Imagen (${imgExt})`,
       fileName: extractedFileName || '',
       isMoodle: isMoodle,
       isUcnl: isUcnl,

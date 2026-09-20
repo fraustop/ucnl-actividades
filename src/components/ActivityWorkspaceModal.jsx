@@ -27,6 +27,12 @@ import {
   Maximize2, 
   Minimize2, 
   RotateCcw, 
+  RotateCw,
+  ZoomIn,
+  ZoomOut,
+  Sun,
+  Moon,
+  Grid,
   Film, 
   Music, 
   Image as ImageIcon, 
@@ -119,8 +125,12 @@ export const ActivityWorkspaceModal = ({
   const [activeTab, setActiveTab] = useState('viewer'); // 'viewer' | 'comments' | 'upload' | 'share_link'
   const [activeResource, setActiveResource] = useState(null);
   const [isFullscreenViewer, setIsFullscreenViewer] = useState(false);
-  const [useGoogleDocsFallback, setUseGoogleDocsFallback] = useState(false);
-  const [showMoodleIframe, setShowMoodleIframe] = useState(false);
+  
+  // Estados de Control para el Visor de Imágenes y Gráficos
+  const [imageZoom, setImageZoom] = useState(100);
+  const [imageRotation, setImageRotation] = useState(0);
+  const [imageBgMode, setImageBgMode] = useState('dark'); // 'dark' | 'grid' | 'light'
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   // Estados de Comentarios (Por Actividad)
   const [comments, setComments] = useState([]);
@@ -252,6 +262,9 @@ export const ActivityWorkspaceModal = ({
     };
 
     setActiveResource(resObj);
+    setImageZoom(100);
+    setImageRotation(0);
+    setImageLoadError(false);
     setActiveTab('viewer');
 
     // Persistir el último documento abierto tanto para la actividad/materia como globalmente
@@ -949,14 +962,150 @@ export const ActivityWorkspaceModal = ({
             </div>
           )}
 
-          {/* Imagen Directa */}
+          {/* Imagen / Gráfico Directo (PNG, JPG, WebP, SVG, AVIF, GIF, BMP, ICO, TIFF, etc.) */}
           {type === 'image' && (
-            <div className="max-w-full max-h-full overflow-auto flex items-center justify-center p-4">
-              <img
-                src={embedUrl}
-                alt={title}
-                className="max-w-full max-h-[82vh] object-contain rounded-2xl shadow-2xl border border-slate-800"
-              />
+            <div className={`w-full h-full flex flex-col items-center justify-between relative overflow-hidden select-none transition-colors duration-200 ${
+              imageBgMode === 'grid' 
+                ? 'bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px] bg-slate-200 text-slate-800'
+                : imageBgMode === 'light'
+                ? 'bg-white text-slate-900'
+                : 'bg-slate-950 text-white'
+            }`}>
+              
+              {/* Barra Flotante de Herramientas de Imagen / Gráfico */}
+              <div className="absolute top-3 z-20 flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 shadow-2xl text-xs text-slate-200">
+                <span className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  {activeResource.imageFormat || fileExt || 'IMG'}
+                </span>
+
+                <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+                {/* Zoom Out */}
+                <button
+                  type="button"
+                  onClick={() => setImageZoom(prev => Math.max(25, prev - 25))}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+                  title="Reducir zoom (-25%)"
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Zoom % / Reset */}
+                <button
+                  type="button"
+                  onClick={() => setImageZoom(100)}
+                  className="px-2 py-0.5 rounded-lg hover:bg-slate-800 text-[11px] font-mono font-bold text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Restablecer tamaño original (100%)"
+                >
+                  {imageZoom}%
+                </button>
+
+                {/* Zoom In */}
+                <button
+                  type="button"
+                  onClick={() => setImageZoom(prev => Math.min(400, prev + 25))}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer active:scale-95"
+                  title="Aumentar zoom (+25%)"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+                {/* Rotar */}
+                <button
+                  type="button"
+                  onClick={() => setImageRotation(prev => (prev + 90) % 360)}
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer active:scale-95 flex items-center gap-1"
+                  title="Girar 90° en sentido horario"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  {imageRotation > 0 && <span className="text-[10px] font-mono">{imageRotation}°</span>}
+                </button>
+
+                <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+                {/* Fondo: Oscuro / Cuadrícula Transparente / Blanco */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (imageBgMode === 'dark') setImageBgMode('grid');
+                    else if (imageBgMode === 'grid') setImageBgMode('light');
+                    else setImageBgMode('dark');
+                  }}
+                  className={`p-1.5 rounded-lg transition cursor-pointer flex items-center gap-1 text-[11px] font-bold ${
+                    imageBgMode === 'grid' 
+                      ? 'bg-indigo-600 text-white' 
+                      : imageBgMode === 'light'
+                      ? 'bg-white text-slate-900 border border-slate-300'
+                      : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                  title={`Modo de fondo: ${imageBgMode === 'dark' ? 'Oscuro' : imageBgMode === 'grid' ? 'Cuadrícula (transparencia)' : 'Claro'}`}
+                >
+                  {imageBgMode === 'dark' ? <Moon className="w-3.5 h-3.5" /> : imageBgMode === 'grid' ? <Grid className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline text-[10px] capitalize">{imageBgMode === 'grid' ? 'Cuadrícula' : imageBgMode === 'light' ? 'Claro' : 'Oscuro'}</span>
+                </button>
+
+                <div className="h-4 w-px bg-slate-700 mx-0.5" />
+
+                {/* Descarga directa */}
+                <a
+                  href={originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={fileName || true}
+                  className="p-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600 text-emerald-300 hover:text-white transition cursor-pointer active:scale-95"
+                  title="Descargar imagen o gráfico"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </a>
+              </div>
+
+              {/* Contenedor con Scroll y Zoom */}
+              <div className="flex-1 w-full h-full overflow-auto flex items-center justify-center p-4 pt-16">
+                {imageLoadError ? (
+                  <div className="max-w-md p-6 bg-slate-900/90 border border-rose-500/40 rounded-3xl text-center space-y-4 shadow-2xl">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+                      <ImageIcon className="w-7 h-7" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-white">No se pudo cargar la imagen directamente</h4>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        El enlace o formato del gráfico puede requerir abrirse directamente en el navegador.
+                      </p>
+                    </div>
+                    <div className="flex justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setImageLoadError(false)}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold"
+                      >
+                        Reintentar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDefaultBrowser(originalUrl)}
+                        className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 shadow"
+                      >
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>Abrir en Navegador</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={embedUrl || originalUrl}
+                    alt={title}
+                    onError={() => setImageLoadError(true)}
+                    style={{
+                      transform: `scale(${imageZoom / 100}) rotate(${imageRotation}deg)`,
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.15s ease-out'
+                    }}
+                    className="max-w-full max-h-[82vh] object-contain rounded-xl shadow-2xl transition-all duration-150"
+                  />
+                )}
+              </div>
             </div>
           )}
 
@@ -1780,8 +1929,8 @@ export const ActivityWorkspaceModal = ({
                 <form onSubmit={handleUploadFile} className="space-y-4">
                   <div className="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-3xl p-6 text-center space-y-3 bg-slate-900/60 transition">
                     <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto"><Upload className="w-6 h-6" /></div>
-                    <div><p className="text-xs font-bold text-white">Selecciona un archivo</p><p className="text-[11px] text-slate-400 mt-0.5">PDF, DOCX, XLSX, PPTX, JPG, PNG, MP4, ZIP (max 50MB)</p></div>
-                    <input type="file" onChange={(e) => setUploadFile(e.target.files[0])} className="text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
+                    <div><p className="text-xs font-bold text-white">Selecciona un archivo o gráfico</p><p className="text-[11px] text-slate-400 mt-0.5">PDF, DOCX, XLSX, PPTX, JPG, PNG, WebP, SVG, AVIF, GIF, MP4, ZIP (máx. 50MB)</p></div>
+                    <input type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv,.svg,.webp,.avif" onChange={(e) => setUploadFile(e.target.files[0])} className="text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
                     {uploadFile && <div className="p-2.5 bg-slate-800 rounded-xl border border-slate-700 text-xs text-slate-200 flex items-center justify-between"><div className="flex items-center gap-2 truncate"><FileIcon category={uploadFile.name.split('.').pop()} className="w-4 h-4" /><span className="truncate font-semibold">{uploadFile.name}</span></div><span className="text-[10px] text-slate-400 flex-shrink-0 ml-2">{formatBytes(uploadFile.size)}</span></div>}
                   </div>
                   {isUploading && <div className="space-y-1.5"><div className="flex justify-between text-xs text-slate-300 font-bold"><span>Subiendo...</span><span>{uploadProgress}%</span></div><div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-200" style={{ width: `${uploadProgress}%` }} /></div></div>}
