@@ -54,7 +54,6 @@ import ActivityDetailsModal from './components/ActivityDetailsModal';
 import ActivityWorkspaceModal from './components/ActivityWorkspaceModal';
 import ActivityFilters from './components/ActivityFilters';
 import ConfigModal from './components/ConfigModal';
-import ResourcesModal from './components/ResourcesModal';
 import KanbanView from './components/KanbanView';
 import ListView from './components/ListView';
 import CalendarView from './components/CalendarView';
@@ -92,11 +91,11 @@ export function App() {
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [selectedActivityId, setSelectedActivityId] = useState(initialNav.activityId || null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(initialNav.modal === 'activity_details');
-  const [workspaceModalOpen, setWorkspaceModalOpen] = useState(initialNav.modal === 'workspace');
+  const [workspaceModalOpen, setWorkspaceModalOpen] = useState(initialNav.modal === 'workspace' || initialNav.modal === 'resources');
   const [workspaceActivity, setWorkspaceActivity] = useState(null);
   const [configModalOpen, setConfigModalOpen] = useState(initialNav.modal === 'config');
   const [configModalTab, setConfigModalTab] = useState(initialNav.configTab || 'tetras');
-  const [resourcesModalOpen, setResourcesModalOpen] = useState(initialNav.modal === 'resources');
+  const [resourcesModalOpen, setResourcesModalOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(initialNav.modal === 'notifications');
 
   const handleSelectActivityFromNotification = (activityId) => {
@@ -298,9 +297,8 @@ export function App() {
       selectedStatus: override.selectedStatus !== undefined ? override.selectedStatus : selectedStatus,
       searchQuery: override.searchQuery !== undefined ? override.searchQuery : searchQuery,
       modal: override.modal !== undefined ? override.modal : (
-        workspaceModalOpen ? 'workspace' :
+        workspaceModalOpen ? (workspaceActivity ? 'workspace' : 'resources') :
         configModalOpen ? 'config' :
-        resourcesModalOpen ? 'resources' :
         notificationDrawerOpen ? 'notifications' :
         activityModalOpen ? 'new_activity' :
         detailsModalOpen ? 'activity_details' : null
@@ -335,12 +333,13 @@ export function App() {
         setDetailsModalOpen(false);
         setWorkspaceModalOpen(false);
       } else if (nav.modal === 'resources') {
-        setResourcesModalOpen(true);
+        setWorkspaceActivity(null);
+        setWorkspaceModalOpen(true);
         setConfigModalOpen(false);
         setNotificationDrawerOpen(false);
         setActivityModalOpen(false);
         setDetailsModalOpen(false);
-        setWorkspaceModalOpen(false);
+        setResourcesModalOpen(false);
       } else if (nav.modal === 'notifications') {
         setNotificationDrawerOpen(true);
         setConfigModalOpen(false);
@@ -355,12 +354,16 @@ export function App() {
         setNotificationDrawerOpen(false);
         setDetailsModalOpen(false);
         setWorkspaceModalOpen(false);
-      } else if (nav.modal === 'workspace' && nav.activityId) {
-        setSelectedActivityId(nav.activityId);
-        const found = activities.find(a => a.id === nav.activityId);
-        if (found) {
-          setSelectedActivity(found);
-          setWorkspaceActivity(found);
+      } else if (nav.modal === 'workspace') {
+        if (nav.activityId) {
+          setSelectedActivityId(nav.activityId);
+          const found = activities.find(a => a.id === nav.activityId);
+          if (found) {
+            setSelectedActivity(found);
+            setWorkspaceActivity(found);
+          }
+        } else {
+          setWorkspaceActivity(null);
         }
         setWorkspaceModalOpen(true);
         setDetailsModalOpen(false);
@@ -484,16 +487,20 @@ export function App() {
   };
 
   const handleOpenResources = () => {
-    setResourcesModalOpen(true);
+    setWorkspaceActivity(null);
+    setWorkspaceModalOpen(true);
     setConfigModalOpen(false);
     setDetailsModalOpen(false);
     setNotificationDrawerOpen(false);
-    syncNav({ modal: 'resources' }, true);
+    setResourcesModalOpen(false);
+    syncNav({ modal: 'resources', activityId: null }, true);
   };
 
   const handleCloseResources = () => {
+    setWorkspaceModalOpen(false);
+    setWorkspaceActivity(null);
     setResourcesModalOpen(false);
-    syncNav({ modal: null }, true);
+    syncNav({ modal: null, activityId: null }, true);
   };
 
   const handleOpenNotificationDrawer = () => {
@@ -511,14 +518,18 @@ export function App() {
 
   const handleOpenWorkspace = (activity) => {
     const act = activity || selectedActivity;
-    if (!act) return;
-    setWorkspaceActivity(act);
+    setWorkspaceActivity(act || null);
     setWorkspaceModalOpen(true);
-    syncNav({ modal: 'workspace', activityId: act.id }, true);
+    setConfigModalOpen(false);
+    setDetailsModalOpen(false);
+    setNotificationDrawerOpen(false);
+    setResourcesModalOpen(false);
+    syncNav({ modal: 'workspace', activityId: act?.id || null }, true);
   };
 
   const handleCloseWorkspace = () => {
     setWorkspaceModalOpen(false);
+    setWorkspaceActivity(null);
     if (detailsModalOpen && selectedActivity) {
       syncNav({ modal: 'activity_details', activityId: selectedActivity.id }, true);
     } else {
@@ -683,7 +694,7 @@ export function App() {
       <NotificationActivationReminder />
 
       {/* Banner de Filtros con Fondo Cromado en 1 Sola Fila Pegado al Encabezado (Oculto cuando ConfigModal o WorkspaceModal está activo) */}
-      <div id="ucnl-main-ribbon" className={(configModalOpen || (workspaceModalOpen && (workspaceActivity || selectedActivity))) ? 'hidden' : 'block'}>
+      <div id="ucnl-main-ribbon" className={(configModalOpen || workspaceModalOpen) ? 'hidden' : 'block'}>
         <ActivityFilters
           searchQuery={searchQuery}
           setSearchQuery={handleSearchQueryChange}
@@ -718,18 +729,29 @@ export function App() {
           isAdmin={isAdmin}
           currentUser={currentUser}
         />
-      ) : (workspaceModalOpen && (workspaceActivity || selectedActivity)) ? (
+      ) : workspaceModalOpen ? (
         <ActivityWorkspaceModal
           isOpen={workspaceModalOpen}
           onClose={handleCloseWorkspace}
-          activity={workspaceActivity || selectedActivity}
+          activity={workspaceActivity}
+          onSelectActivity={(act) => {
+            setWorkspaceActivity(act);
+            if (act) {
+              syncNav({ modal: 'workspace', activityId: act.id }, false);
+            } else {
+              syncNav({ modal: 'resources', activityId: null }, false);
+            }
+          }}
+          activities={activities}
+          academicStructure={academicStructure}
+          studentCompletions={studentCompletions}
           onEditActivity={(act) => {
             handleCloseWorkspace();
             handleEditActivity(act);
           }}
           personalStatus={
-            (workspaceActivity || selectedActivity)
-              ? (studentCompletions[(workspaceActivity || selectedActivity).id] || 'pending')
+            workspaceActivity
+              ? (studentCompletions[workspaceActivity.id] || 'pending')
               : 'pending'
           }
           onSetPersonalStatus={handleSetPersonalStatus}
@@ -832,16 +854,7 @@ export function App() {
         />
       )}
 
-      {/* Modal de Recursos y Enlaces Institucionales */}
-      {resourcesModalOpen && (
-        <ResourcesModal
-          isOpen={resourcesModalOpen}
-          onClose={handleCloseResources}
-          isAdmin={isAdmin}
-          isEditor={isEditor}
-          currentUser={currentUser}
-        />
-      )}
+
 
       {/* Modal de Autenticación */}
       {authModalState.isOpen && (

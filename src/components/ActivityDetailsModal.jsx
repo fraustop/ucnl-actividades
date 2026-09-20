@@ -18,7 +18,8 @@ import {
   MessagesSquare,
   MessageCircle,
   GraduationCap,
-  FolderOpen
+  FolderOpen,
+  Eye
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ACTIVITY_STATUSES, ACTIVITY_TYPES } from '../types/constants';
@@ -487,21 +488,36 @@ export const ActivityDetailsModal = ({
               </h3>
               <div className="space-y-2">
                 {links.map((link, idx) => (
-                  <a
+                  <div
                     key={idx}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-3 rounded-xl bg-blue-50/60 hover:bg-blue-100/80 border border-blue-200 text-blue-800 transition font-semibold text-xs group"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/60 hover:bg-blue-100/80 border border-blue-200 text-blue-800 transition font-semibold text-xs group"
                   >
                     <div className="flex items-center space-x-2 truncate pr-2">
                       <ExternalLink className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
                       <span className="truncate">{link.title || link.url}</span>
                     </div>
-                    <span className="text-blue-600 font-bold group-hover:underline flex-shrink-0">
-                      Abrir ↗
-                    </span>
-                  </a>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {onOpenWorkspace && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenWorkspace(activity)}
+                          className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-blue-600 text-white hover:bg-blue-700 transition shadow-2xs cursor-pointer"
+                          title="Abrir en Visor y Espacio de Trabajo"
+                        >
+                          Visor
+                        </button>
+                      )}
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 font-bold hover:underline px-1 py-0.5"
+                        title="Abrir en pestaña nueva"
+                      >
+                        ↗
+                      </a>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -536,16 +552,29 @@ export const ActivityDetailsModal = ({
                       </div>
                     </div>
 
-                    <a
-                      href={file.downloadUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download={file.name}
-                      className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
-                      title="Descargar archivo"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {onOpenWorkspace && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenWorkspace(activity)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 border border-blue-200/80 rounded-lg transition cursor-pointer"
+                          title="Ver en visor integrado"
+                        >
+                          <Eye className="w-3 h-3 text-blue-600" />
+                          <span>Ver</span>
+                        </button>
+                      )}
+                      <a
+                        href={file.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={file.name}
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        title="Descargar archivo"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>

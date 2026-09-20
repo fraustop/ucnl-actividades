@@ -304,22 +304,6 @@ export const Navbar = ({
               <span className="hidden sm:inline">Recursos</span>
             </button>
 
-            {/* Botón Configuración (Solo Docente y Admin) */}
-            {isEditor && (
-              <button
-                onClick={handleConfigClick}
-                title={isAdmin ? "Configuración y Administración de Usuarios" : "Configuración de Tetramestres y Materias"}
-                className={`inline-flex items-center justify-center space-x-1 h-[22px] px-2 rounded text-[10px] font-semibold transition shadow-2xs border flex-shrink-0 active:scale-95 ${
-                  isAdmin 
-                    ? 'bg-indigo-500/25 hover:bg-indigo-500/35 text-indigo-200 border-indigo-400/40' 
-                    : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/15'
-                }`}
-              >
-                <Settings className={`w-3 h-3 ${isAdmin ? 'text-indigo-300' : 'text-slate-300'}`} />
-                <span className="hidden sm:inline">Ajustes</span>
-              </button>
-            )}
-
             {/* Usuario / Autenticación */}
             {currentUser ? (
               <div className="relative">

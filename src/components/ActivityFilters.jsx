@@ -649,6 +649,17 @@ export const ActivityFilters = ({
           </button>
         </div>
 
+        {/* Botón Configuración sin etiqueta (Solo Docente y Admin, a la derecha del selector de vista) */}
+        {isEditor && onOpenConfigModal && (
+          <button
+            onClick={onOpenConfigModal}
+            title={isAdmin ? "Configuración y Administración de Usuarios" : "Configuración de Tetramestres y Materias"}
+            className="p-2 rounded-xl text-slate-700 hover:text-slate-900 bg-white/95 hover:bg-white border border-slate-300/90 shadow-xs transition active:scale-95 flex-shrink-0"
+          >
+            <Settings className={`w-3.5 h-3.5 ${isAdmin ? 'text-indigo-600' : 'text-slate-600'}`} />
+          </button>
+        )}
+
         {/* Botón Nueva Actividad (Solo Admin en Ribbon) */}
         {isAdmin && onOpenNewActivity && (
           <button
