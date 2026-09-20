@@ -27,12 +27,6 @@ import {
   Clock,
   Sparkles,
   Send,
-  Server,
-  Globe,
-  RefreshCw,
-  Radio,
-  ExternalLink,
-  Calendar,
   LayoutGrid,
   List
 } from 'lucide-react';
@@ -49,13 +43,7 @@ import {
   saveNotificationScheduleConfig,
   sendLocalTestNotification,
   DEFAULT_NOTIFICATION_CONFIG,
-  areNotificationsSupported,
-  fetchBackendStatus,
-  triggerBackendDueEvaluation,
-  triggerDaily7DaysReminder,
-  getBackendUrl,
-  setBackendUrl,
-  DEFAULT_BACKEND_URL
+  areNotificationsSupported
 } from '../services/notificationService';
 
 export const ConfigModal = ({
@@ -104,15 +92,6 @@ export const ConfigModal = ({
   const [notificationError, setNotificationError] = useState('');
   const [testNotificationLoading, setTestNotificationLoading] = useState(false);
   const [testNotificationResult, setTestNotificationResult] = useState('');
-
-  // Estados para Backend Autónomo
-  const [backendUrlInput, setBackendUrlInput] = useState(getBackendUrl());
-  const [backendStatus, setBackendStatus] = useState(null);
-  const [backendChecking, setBackendChecking] = useState(false);
-  const [triggerDueLoading, setTriggerDueLoading] = useState(false);
-  const [triggerDueResult, setTriggerDueResult] = useState('');
-  const [triggerDailyLoading, setTriggerDailyLoading] = useState(false);
-  const [triggerDailyResult, setTriggerDailyResult] = useState('');
 
   // Estados para Gestión de Usuarios
   const [usersList, setUsersList] = useState([]);
@@ -213,63 +192,6 @@ export const ConfigModal = ({
       setTestNotificationLoading(false);
     }
   };
-
-  const handleCheckBackend = async () => {
-    setBackendChecking(true);
-    setBackendStatus(null);
-    try {
-      const res = await fetchBackendStatus(backendUrlInput);
-      setBackendStatus(res);
-      if (res.ok) {
-        setBackendUrl(backendUrlInput);
-      }
-    } catch (e) {
-      setBackendStatus({ ok: false, error: e.message || 'Error de conexión' });
-    } finally {
-      setBackendChecking(false);
-    }
-  };
-
-  const handleTriggerBackendDue = async () => {
-    setTriggerDueLoading(true);
-    setTriggerDueResult('');
-    try {
-      const res = await triggerBackendDueEvaluation(backendUrlInput);
-      setTriggerDueResult(`¡Evaluación completada! ${res.alertsFound !== undefined ? res.alertsFound : 0} alertas procesadas.`);
-      setTimeout(() => setTriggerDueResult(''), 6000);
-    } catch (e) {
-      setTriggerDueResult(`Error: ${e.message}`);
-      setTimeout(() => setTriggerDueResult(''), 6000);
-    } finally {
-      setTriggerDueLoading(false);
-    }
-  };
-
-  const handleTriggerDaily7Days = async () => {
-    setTriggerDailyLoading(true);
-    setTriggerDailyResult('');
-    try {
-      const res = await triggerDaily7DaysReminder(backendUrlInput);
-      if (res.success) {
-        setTriggerDailyResult(`✅ Recordatorio diario ejecutado: ${res.results?.studentsNotified || 0} estudiantes notificados (${res.results?.totalSent || 0} mensajes push enviados).`);
-      } else {
-        setTriggerDailyResult(`⚠️ ${res.message || res.error || 'Evaluación terminada.'}`);
-      }
-      setTimeout(() => setTriggerDailyResult(''), 7000);
-    } catch (e) {
-      setTriggerDailyResult(`Error: ${e.message}`);
-      setTimeout(() => setTriggerDailyResult(''), 7000);
-    } finally {
-      setTriggerDailyLoading(false);
-    }
-  };
-
-  // Comprobar estado del backend al entrar a la pestaña de notificaciones
-  useEffect(() => {
-    if (activeTab === 'notifications' && isOpen) {
-      handleCheckBackend();
-    }
-  }, [activeTab, isOpen]);
 
   if (!isOpen) return null;
 
@@ -1400,115 +1322,6 @@ export const ConfigModal = ({
                 </div>
               )}
 
-              {/* Tarjeta de Servidor Backend Autónomo (IP Externa / Local / Tareas Cron) */}
-              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white p-4 sm:p-5 rounded-2xl shadow-md border border-slate-700 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/60 pb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/30 flex-shrink-0">
-                      <Server className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-bold text-sm text-white">Servidor Backend de Notificaciones</h4>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                          backendStatus?.ok
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        }`}>
-                          {backendStatus?.ok ? '● En Línea 24/7' : '○ Comprobando...'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 mt-0.5">
-                        Ejecutándose de forma autónoma con cron jobs y escuchador de Firestore.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCheckBackend}
-                      disabled={backendChecking}
-                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${backendChecking ? 'animate-spin' : ''}`} />
-                      <span>Verificar IP</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleTriggerBackendDue}
-                      disabled={triggerDueLoading}
-                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition disabled:opacity-50"
-                    >
-                      {triggerDueLoading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Radio className="w-3.5 h-3.5" />
-                      )}
-                      <span>Evaluar Tareas Ahora</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Datos de Red e IPs */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 bg-black/30 rounded-xl border border-white/10 space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">🌐 IP Externa Pública</span>
-                    <span className="font-mono text-cyan-300 font-bold text-sm break-all">
-                      {backendStatus?.data?.externalIp || '148.230.165.236'}
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-black/30 rounded-xl border border-white/10 space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">🏠 IP Local LAN</span>
-                    <span className="font-mono text-emerald-300 font-bold text-sm">
-                      {backendStatus?.data?.localIp || '10.200.79.130'}:3001
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-black/30 rounded-xl border border-white/10 space-y-1">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">⏰ Programación Automática</span>
-                    <span className="text-amber-300 font-bold">
-                      {notificationConfig.notificationHour || '08:00'} AM (1 vez al día)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Input de URL del Backend */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
-                  <div className="flex-1">
-                    <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      URL del Endpoint Backend
-                    </label>
-                    <input
-                      type="text"
-                      value={backendUrlInput}
-                      onChange={(e) => setBackendUrlInput(e.target.value)}
-                      placeholder="http://148.230.165.236:3001"
-                      className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/20 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="sm:self-end">
-                    <a
-                      href={`${backendUrlInput}/api/status`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-slate-200 border border-white/20 transition"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Abrir API Status</span>
-                    </a>
-                  </div>
-                </div>
-
-                {triggerDueResult && (
-                  <div className="p-3 bg-indigo-900/60 border border-indigo-400/40 rounded-xl text-xs text-indigo-200 animate-in fade-in">
-                    {triggerDueResult}
-                  </div>
-                )}
-              </div>
-
               {/* Sección 1: Recordatorio Diario de Actividades Pendientes (Próximos 7 Días) */}
               <div className="bg-slate-50 border border-slate-200 p-4 sm:p-5 rounded-2xl space-y-4">
                 <div className="flex items-start sm:items-center justify-between flex-col sm:flex-row gap-2">
@@ -1585,33 +1398,6 @@ export const ConfigModal = ({
                         A las <strong>{notificationConfig.notificationHour || '08:00'}</strong>, cada alumno recibe una notificación push con la cantidad exacta de tareas pendientes que vencen en los próximos 7 días, descontando las que ya marcó como terminadas.
                       </p>
                     </div>
-                  </div>
-                )}
-
-                {/* Botón de prueba rápida del recordatorio diario */}
-                <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-t border-slate-200/60">
-                  <button
-                    type="button"
-                    onClick={handleTriggerDaily7Days}
-                    disabled={triggerDailyLoading || (backendStatus && !backendStatus.ok)}
-                    className="inline-flex items-center space-x-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl font-bold text-xs transition shadow-xs disabled:opacity-50"
-                  >
-                    {triggerDailyLoading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Calendar className="w-3.5 h-3.5" />
-                    )}
-                    <span>Probar Recordatorio Diario de 7 Días Ahora</span>
-                  </button>
-
-                  <span className="text-[11px] text-slate-400">
-                    Evalúa actividades de $\le$ 7 días y envía push a dispositivos
-                  </span>
-                </div>
-
-                {triggerDailyResult && (
-                  <div className="p-3 bg-blue-900/80 border border-blue-400/40 rounded-xl text-xs text-blue-100 animate-in fade-in">
-                    {triggerDailyResult}
                   </div>
                 )}
               </div>
