@@ -88,7 +88,8 @@ export const ActivityWorkspaceModal = ({
   initialMode = 'activity', // 'activity' | 'subject'
   initialTetraId = null,
   initialSubjectId = null,
-  onModeChange = null
+  onModeChange = null,
+  onSelectSubject = null
 }) => {
   const { currentUser, userProfile, isAdmin, isEditor, isDocente } = useAuth();
   const canManageSubject = isAdmin || isEditor || isDocente;
@@ -145,7 +146,7 @@ export const ActivityWorkspaceModal = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const [showSecurityExplanation, setShowSecurityExplanation] = useState(false);
 
-  // Sincronizar props
+  // Sincronizar props de modo y selecciones
   useEffect(() => {
     if (initialMode) {
       setWorkspaceMode(initialMode);
@@ -155,20 +156,28 @@ export const ActivityWorkspaceModal = ({
   useEffect(() => {
     if (activity) {
       setCurrentActivity(activity);
-      setWorkspaceMode('activity');
     }
   }, [activity]);
 
   useEffect(() => {
-    if (academicStructure && academicStructure.length > 0) {
-      const validTetra = academicStructure.find(t => t.id === (initialTetraId || selectedTetraId)) || academicStructure[0];
-      const targetTetraId = validTetra?.id || '';
-      setSelectedTetraId(targetTetraId);
-
-      const validSubject = validTetra?.subjects?.find(s => s.id === (initialSubjectId || selectedSubjectId)) || validTetra?.subjects?.[0];
-      setSelectedSubjectId(validSubject?.id || '');
+    if (initialTetraId) {
+      setSelectedTetraId(initialTetraId);
     }
-  }, [initialTetraId, initialSubjectId, academicStructure]);
+  }, [initialTetraId]);
+
+  useEffect(() => {
+    if (initialSubjectId) {
+      setSelectedSubjectId(initialSubjectId);
+    }
+  }, [initialSubjectId]);
+
+  useEffect(() => {
+    if (academicStructure && academicStructure.length > 0) {
+      if (!selectedTetraId) {
+        setSelectedTetraId(academicStructure[0]?.id || '');
+      }
+    }
+  }, [academicStructure, selectedTetraId]);
 
   // SuscripciÃƒÂ³n en tiempo real a los recursos de la materia
   useEffect(() => {
@@ -261,8 +270,12 @@ export const ActivityWorkspaceModal = ({
     setSelectedTetraId(tetraId);
     const target = academicStructure.find(t => t.id === tetraId);
     const firstSub = target?.subjects?.[0];
-    setSelectedSubjectId(firstSub?.id || '');
+    const newSubId = firstSub?.id || '';
+    setSelectedSubjectId(newSubId);
     setActiveResource(null);
+    if (onSelectSubject && newSubId) {
+      onSelectSubject(tetraId, newSubId);
+    }
   };
 
   // Cambiar materia en modo subject
@@ -270,6 +283,9 @@ export const ActivityWorkspaceModal = ({
     setSelectedSubjectId(subjectId);
     setActiveResource(null);
     setActiveTab('viewer');
+    if (onSelectSubject) {
+      onSelectSubject(selectedTetraId, subjectId);
+    }
   };
 
   // Guardar programa / descripciÃƒÂ³n de la materia
@@ -949,21 +965,27 @@ export const ActivityWorkspaceModal = ({
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="relative flex w-full h-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
 
-        {/* COLUMNA IZQUIERDA */}
-        <div className="w-[320px] flex-shrink-0 flex flex-col h-full overflow-hidden bg-slate-50 border-r border-slate-200">
+        {/* COLUMNA IZQUIERDA (Panel ampliado en 30% a 416px) */}
+        <div className="w-full sm:w-[416px] flex-shrink-0 flex flex-col h-full overflow-hidden bg-slate-50 border-r border-slate-200">
 
           {/* Selector deslizable */}
-          <div className="px-3 py-2.5 bg-slate-900 border-b border-slate-800 flex-shrink-0">
+          <div className="px-3.5 py-2.5 bg-slate-900 border-b border-slate-800 flex-shrink-0">
             <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700/60 shadow-inner">
               <button type="button"
-                onClick={() => { setWorkspaceMode('activity'); setActiveTab('viewer'); setActiveResource(null); if (onModeChange) onModeChange('activity'); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${workspaceMode === 'activity' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
+                onClick={() => { 
+                  setWorkspaceMode('activity'); 
+                  if (onModeChange) onModeChange('activity'); 
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${workspaceMode === 'activity' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
                 <FileText className="w-3.5 h-3.5" /><span>Por Actividad</span>
                 {activities?.length > 0 && <span className="text-[9px] px-1.5 rounded-full bg-white/20 font-mono">{activities.length}</span>}
               </button>
               <button type="button"
-                onClick={() => { setWorkspaceMode('subject'); setSelectedSubjectId(''); setActiveTab('viewer'); setActiveResource(null); if (onModeChange) onModeChange('subject'); }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition cursor-pointer ${workspaceMode === 'subject' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
+                onClick={() => { 
+                  setWorkspaceMode('subject'); 
+                  if (onModeChange) onModeChange('subject'); 
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-bold transition cursor-pointer ${workspaceMode === 'subject' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>
                 <BookOpen className="w-3.5 h-3.5" /><span>Por Materia</span>
               </button>
             </div>

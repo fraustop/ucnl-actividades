@@ -787,7 +787,7 @@ export function App() {
         />
       </div>
 
-      {/* Vista de Configuración a pantalla completa (a la altura del ribbon) o Espacio de Recursos o Contenedor Principal Dividido */}
+      {/* Vista de Configuración a pantalla completa (a la altura del ribbon) o Contenedor Principal Dividido */}
       {configModalOpen ? (
         <ConfigModal
           isOpen={configModalOpen}
@@ -800,36 +800,10 @@ export function App() {
           currentUser={currentUser}
           onOpenSubjectResources={(tetraId, subjectId) => handleOpenSubjectResources(tetraId, subjectId)}
         />
-      ) : workspaceModalOpen ? (
-        <ActivityWorkspaceModal
-          isOpen={workspaceModalOpen}
-          onClose={handleCloseWorkspace}
-          activity={workspaceActivity}
-          onSelectActivity={(act) => {
-            setWorkspaceActivity(act);
-            if (act) {
-              syncNav({ modal: 'workspace', activityId: act.id }, false);
-            } else {
-              syncNav({ modal: 'resources', activityId: null }, false);
-            }
-          }}
-          activities={activities}
-          academicStructure={academicStructure}
-          studentCompletions={studentCompletions}
-          onEditActivity={(act) => {
-            handleCloseWorkspace();
-            handleEditActivity(act);
-          }}
-          personalStatus={
-            workspaceActivity
-              ? (studentCompletions[workspaceActivity.id] || 'pending')
-              : 'pending'
-          }
-          onSetPersonalStatus={handleSetPersonalStatus}
-        />
       ) : (
         /* Contenedor Dividido: Área Principal + Panel Lateral Derecho (Empuja el contenido en Desktop) */
         <div className="flex-1 flex flex-row items-stretch w-full overflow-hidden min-h-0 relative">
+
           
           {/* Contenido Principal (Kanban / Lista / Calendario) */}
           <main className="flex-1 min-w-0 px-3 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col h-full overflow-hidden min-h-0 transition-all duration-300">
@@ -943,18 +917,36 @@ export function App() {
           isOpen={workspaceModalOpen}
           onClose={handleCloseWorkspace}
           activity={workspaceActivity}
+          onSelectActivity={(act) => {
+            setWorkspaceActivity(act);
+            syncNav({ modal: 'workspace', workspaceMode: 'activity', activityId: act?.id, activity: act }, false);
+          }}
           activities={activities}
           academicStructure={academicStructure}
           studentCompletions={studentCompletions}
           initialMode={workspaceMode}
           initialTetraId={workspaceTetraId}
           initialSubjectId={workspaceSubjectId}
-          onModeChange={setWorkspaceMode}
+          onModeChange={(newMode) => {
+            setWorkspaceMode(newMode);
+            syncNav({ modal: 'workspace', workspaceMode: newMode }, false);
+          }}
+          onSelectSubject={(tetraId, subjectId) => {
+            setWorkspaceTetraId(tetraId);
+            setWorkspaceSubjectId(subjectId);
+            syncNav({ modal: 'workspace', workspaceMode: 'subject', tetraId, subjectId }, false);
+          }}
           onOpenActivity={handleOpenWorkspace}
           onEditActivity={handleEditActivity}
+          personalStatus={
+            workspaceActivity
+              ? (studentCompletions[workspaceActivity.id] || 'pending')
+              : 'pending'
+          }
           onSetPersonalStatus={handleSetPersonalStatus}
         />
       )}
+
 
       {/* Panel de Notificaciones: Superior y por encima de todo */}
       {notificationDrawerOpen && (
