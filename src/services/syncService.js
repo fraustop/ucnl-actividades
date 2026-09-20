@@ -10,7 +10,13 @@ import {
   onSnapshot, 
   deleteField 
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { 
+  ref as rtdbRef, 
+  onValue as rtdbOnValue, 
+  set as rtdbSet, 
+  update as rtdbUpdate 
+} from 'firebase/database';
+import { db, rtdb } from './firebase';
 import { 
   STORES, 
   getAllFromStore, 
@@ -26,17 +32,39 @@ const META_SYNC_REF = doc(db, 'metadata', 'sync_meta');
 const CONFIG_STRUCTURE_REF = doc(db, 'config', 'academic_structure');
 const LOCAL_META_ID = 'global_meta';
 const LOCAL_STRUCTURE_ID = 'academic_structure';
+const RTDB_SYNC_PATH = 'sync_signal';
 
 /**
- * Inicializa la sincronización Delta ultra-eficiente:
- * 1. Carga inmediata desde IndexedDB (0 lecturas de Firestore, latencia instantánea).
- * 2. Escucha UN SOLO documento de metadata ('metadata/sync_meta') en tiempo real (1 sola lectura).
- * 3. Compara el mapa de versiones con IndexedDB y descarga ÚNICAMENTE los documentos modificados o nuevos.
+ * Emite una señal ultraligera por RTDB (pesa ~50 bytes, 0 lecturas en Firestore)
+ */
+const broadcastRtdbSignal = async (payload = {}) => {
+  try {
+    if (!rtdb) return;
+    const signalRef = rtdbRef(rtdb, RTDB_SYNC_PATH);
+    const now = Date.now();
+    await rtdbUpdate(signalRef, {
+      v: now,
+      lastUpdated: new Date().toISOString(),
+      ...payload
+    });
+  } catch (err) {
+    // RTDB es complementario, si está desconectado continúa con Firestore
+    console.debug('Aviso RTDB signal:', err.message);
+  }
+};
+
+/**
+ * Inicializa la sincronización Delta ultra-eficiente con RTDB + Firestore + IndexedDB:
+ * 1. Carga inmediata desde IndexedDB local (0 lecturas a Firestore, 0 ms).
+ * 2. Comprobación ultraligera por RTDB (pesa ~50 bytes, 0 lecturas a Firestore).
+ * 3. Si no hay cambios: 0 lecturas en Firestore.
+ * 4. Si hay cambios: Descarga ÚNICAMENTE el documento modificado y lo guarda en IndexedDB.
  */
 export const initSync = (onDataUpdated, onError) => {
   let isUnsubscribed = false;
   let currentStructure = [];
   let currentActivities = [];
+  let unsubFirestoreMeta = null;
 
   // Paso 1: Carga instantánea desde IndexedDB local (0 lecturas)
   const loadLocalCache = async () => {
@@ -61,139 +89,173 @@ export const initSync = (onDataUpdated, onError) => {
 
   loadLocalCache();
 
-  // Paso 2: Escuchar ÚNICAMENTE el documento de metadata ('metadata/sync_meta')
-  // Esto consume 1 sola lectura al conectar en lugar de leer toda la base de datos
-  const unsubMeta = onSnapshot(
-    META_SYNC_REF,
-    async (snapshot) => {
-      try {
+  // Función para procesar metadata y sincronizar delta a IndexedDB
+  const processDeltaSync = async (remoteActivitiesMap, remoteStructureUpdated, remoteLastUpdated) => {
+    try {
+      const localActivities = await getAllFromStore(STORES.ACTIVITIES);
+      const localStructureDoc = await getFromStore(STORES.ACADEMIC_STRUCTURE, LOCAL_STRUCTURE_ID);
+      const localActMap = new Map((localActivities || []).map((a) => [a.id, a]));
+
+      // Detectar qué actividades necesitan ser descargadas (nuevas o modificadas)
+      const idsToFetch = [];
+      for (const [actId, remoteUpdatedAt] of Object.entries(remoteActivitiesMap)) {
+        const localAct = localActMap.get(actId);
+        if (!localAct || (localAct.updatedAt || localAct.createdAt) !== remoteUpdatedAt) {
+          idsToFetch.push(actId);
+        }
+      }
+
+      // Detectar qué actividades fueron eliminadas remotamente
+      const idsToDelete = [];
+      for (const localAct of localActivities) {
+        if (!remoteActivitiesMap[localAct.id]) {
+          idsToDelete.push(localAct.id);
+        }
+      }
+
+      // Detectar si la estructura académica (Tetras/Materias) cambió
+      const structureChanged = remoteStructureUpdated && (!localStructureDoc || localStructureDoc.updatedAt !== remoteStructureUpdated);
+
+      let newlyAddedActivities = [];
+
+      // Descargar ÚNICAMENTE los documentos que cambiaron de Firestore
+      if (idsToFetch.length > 0) {
+        const fetchPromises = idsToFetch.map(async (actId) => {
+          try {
+            const docSnap = await getDoc(doc(db, 'activities', actId));
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              return {
+                id: docSnap.id,
+                status: data.status || 'pending',
+                ...data
+              };
+            }
+          } catch (fetchErr) {
+            console.warn(`Error al descargar actividad delta ${actId}:`, fetchErr);
+          }
+          return null;
+        });
+
+        const fetchedResults = await Promise.all(fetchPromises);
+        const validFetched = fetchedResults.filter(Boolean);
+
+        if (validFetched.length > 0) {
+          await putManyInStore(STORES.ACTIVITIES, validFetched);
+          newlyAddedActivities = validFetched;
+        }
+      }
+
+      // Eliminar de IndexedDB las actividades que ya no existen
+      if (idsToDelete.length > 0) {
+        for (const delId of idsToDelete) {
+          await deleteFromStore(STORES.ACTIVITIES, delId);
+        }
+      }
+
+      // Si la estructura cambió, descargar solo ese documento
+      if (structureChanged) {
+        try {
+          const structSnap = await getDoc(CONFIG_STRUCTURE_REF);
+          if (structSnap.exists()) {
+            const structData = structSnap.data();
+            currentStructure = structData.tetras || [];
+            await putInStore(STORES.ACADEMIC_STRUCTURE, {
+              id: LOCAL_STRUCTURE_ID,
+              tetras: currentStructure,
+              updatedAt: remoteStructureUpdated
+            });
+          }
+        } catch (structErr) {
+          console.warn('Error al descargar estructura académica:', structErr);
+        }
+      }
+
+      // Guardar metadata local actualizada en IndexedDB
+      await putInStore(STORES.SYNC_META, {
+        id: LOCAL_META_ID,
+        activities: remoteActivitiesMap,
+        structure_updatedAt: remoteStructureUpdated,
+        lastUpdated: remoteLastUpdated || new Date().toISOString()
+      });
+
+      // Obtener la lista definitiva desde IndexedDB local
+      currentActivities = await getAllFromStore(STORES.ACTIVITIES);
+
+      if (!isUnsubscribed) {
+        onDataUpdated({
+          activities: currentActivities,
+          academicStructure: currentStructure,
+          isFromCache: false,
+          newlyAddedActivities: idsToFetch.length > 0 ? newlyAddedActivities : [],
+          deltaStats: {
+            fetched: idsToFetch.length,
+            cached: currentActivities.length
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error en procesamiento Delta:', err);
+      if (onError && !isUnsubscribed) onError(err);
+    }
+  };
+
+  // Paso 2: Conectar con RTDB como semáforo primario ultraligero (~50 bytes, 0 lecturas en Firestore)
+  let unsubRtdb = null;
+  try {
+    if (rtdb) {
+      const signalRef = rtdbRef(rtdb, RTDB_SYNC_PATH);
+      unsubRtdb = rtdbOnValue(
+        signalRef,
+        async (snapshot) => {
+          if (snapshot.exists()) {
+            const signalData = snapshot.val() || {};
+            const remoteActivitiesMap = signalData.activities || {};
+            const remoteStructureUpdated = signalData.structure_updatedAt || '';
+            await processDeltaSync(remoteActivitiesMap, remoteStructureUpdated, signalData.lastUpdated);
+          } else {
+            // Si RTDB no tiene señal aún, consultar Firestore metadata una sola vez para inicializar
+            connectFirestoreFallback();
+          }
+        },
+        (rtdbErr) => {
+          console.debug('RTDB no disponible, activando Firestore metadata listener:', rtdbErr.message);
+          connectFirestoreFallback();
+        }
+      );
+    } else {
+      connectFirestoreFallback();
+    }
+  } catch (err) {
+    connectFirestoreFallback();
+  }
+
+  // Fallback con Firestore Metadata si RTDB no está activo
+  function connectFirestoreFallback() {
+    if (unsubFirestoreMeta || isUnsubscribed) return;
+    unsubFirestoreMeta = onSnapshot(
+      META_SYNC_REF,
+      async (snapshot) => {
         if (!snapshot.exists()) {
-          // Si el documento meta aún no existe (proyecto nuevo), inicializarlo
           await initializeMetaDocument();
           return;
         }
-
         const remoteMeta = snapshot.data() || {};
         const remoteActivitiesMap = remoteMeta.activities || {};
         const remoteStructureUpdated = remoteMeta.structure_updatedAt || '';
-
-        // Obtener estado local de IndexedDB
-        const localActivities = await getAllFromStore(STORES.ACTIVITIES);
-        const localStructureDoc = await getFromStore(STORES.ACADEMIC_STRUCTURE, LOCAL_STRUCTURE_ID);
-        const localActMap = new Map((localActivities || []).map((a) => [a.id, a]));
-
-        // Detectar qué actividades necesitan ser descargadas (nuevas o actualizadas)
-        const idsToFetch = [];
-        for (const [actId, remoteUpdatedAt] of Object.entries(remoteActivitiesMap)) {
-          const localAct = localActMap.get(actId);
-          if (!localAct || (localAct.updatedAt || localAct.createdAt) !== remoteUpdatedAt) {
-            idsToFetch.push(actId);
-          }
-        }
-
-        // Detectar qué actividades fueron eliminadas remotamente
-        const idsToDelete = [];
-        for (const localAct of localActivities) {
-          if (!remoteActivitiesMap[localAct.id]) {
-            idsToDelete.push(localAct.id);
-          }
-        }
-
-        // Detectar si la estructura académica (Tetras/Materias) cambió
-        const structureChanged = remoteStructureUpdated && (!localStructureDoc || localStructureDoc.updatedAt !== remoteStructureUpdated);
-
-        let newlyAddedActivities = [];
-
-        // Descargar ÚNICAMENTE los documentos que cambiaron
-        if (idsToFetch.length > 0) {
-          const fetchPromises = idsToFetch.map(async (actId) => {
-            try {
-              const docSnap = await getDoc(doc(db, 'activities', actId));
-              if (docSnap.exists()) {
-                const data = docSnap.data();
-                return {
-                  id: docSnap.id,
-                  status: data.status || 'pending',
-                  ...data
-                };
-              }
-            } catch (fetchErr) {
-              console.warn(`Error al descargar actividad delta ${actId}:`, fetchErr);
-            }
-            return null;
-          });
-
-          const fetchedResults = await Promise.all(fetchPromises);
-          const validFetched = fetchedResults.filter(Boolean);
-
-          if (validFetched.length > 0) {
-            await putManyInStore(STORES.ACTIVITIES, validFetched);
-            newlyAddedActivities = validFetched;
-          }
-        }
-
-        // Eliminar de IndexedDB las actividades que ya no existen
-        if (idsToDelete.length > 0) {
-          for (const delId of idsToDelete) {
-            await deleteFromStore(STORES.ACTIVITIES, delId);
-          }
-        }
-
-        // Si la estructura cambió, descargar solo ese documento
-        if (structureChanged) {
-          try {
-            const structSnap = await getDoc(CONFIG_STRUCTURE_REF);
-            if (structSnap.exists()) {
-              const structData = structSnap.data();
-              currentStructure = structData.tetras || [];
-              await putInStore(STORES.ACADEMIC_STRUCTURE, {
-                id: LOCAL_STRUCTURE_ID,
-                tetras: currentStructure,
-                updatedAt: remoteStructureUpdated
-              });
-            }
-          } catch (structErr) {
-            console.warn('Error al descargar estructura académica:', structErr);
-          }
-        }
-
-        // Guardar metadata local actualizada en IndexedDB
-        await putInStore(STORES.SYNC_META, {
-          id: LOCAL_META_ID,
-          activities: remoteActivitiesMap,
-          structure_updatedAt: remoteStructureUpdated,
-          lastUpdated: remoteMeta.lastUpdated || new Date().toISOString()
-        });
-
-        // Obtener la lista definitiva desde IndexedDB local
-        currentActivities = await getAllFromStore(STORES.ACTIVITIES);
-
-        if (!isUnsubscribed) {
-          onDataUpdated({
-            activities: currentActivities,
-            academicStructure: currentStructure,
-            isFromCache: false,
-            newlyAddedActivities: idsToFetch.length > 0 ? newlyAddedActivities : [],
-            deltaStats: {
-              fetched: idsToFetch.length,
-              cached: currentActivities.length
-            }
-          });
-        }
-      } catch (err) {
-        console.error('Error en sincronización Delta:', err);
+        await processDeltaSync(remoteActivitiesMap, remoteStructureUpdated, remoteMeta.lastUpdated);
+      },
+      (err) => {
+        console.error('Error al escuchar metadata en Firestore:', err);
         if (onError && !isUnsubscribed) onError(err);
       }
-    },
-    (err) => {
-      console.error('Error al escuchar metadata en Firestore:', err);
-      if (onError && !isUnsubscribed) onError(err);
-    }
-  );
+    );
+  }
 
   return () => {
     isUnsubscribed = true;
-    unsubMeta();
+    if (unsubRtdb) unsubRtdb();
+    if (unsubFirestoreMeta) unsubFirestoreMeta();
   };
 };
 
@@ -224,13 +286,16 @@ const initializeMetaDocument = async () => {
       setDoc(META_DATA_REF, initialMeta, { merge: true }),
       setDoc(META_SYNC_REF, initialMeta, { merge: true })
     ]);
+
+    // Emitir señal a RTDB
+    await broadcastRtdbSignal(initialMeta);
   } catch (err) {
     console.warn('No se pudo inicializar documento meta en Firestore:', err);
   }
 };
 
 /**
- * Crea una nueva actividad escolar y actualiza el documento meta
+ * Crea una nueva actividad escolar y actualiza el documento meta y señal RTDB
  */
 export const createActivityWithSync = async (activityData, user) => {
   const timestamp = new Date().toISOString();
@@ -269,14 +334,19 @@ export const createActivityWithSync = async (activityData, user) => {
     setDoc(META_SYNC_REF, metaUpdate, { merge: true })
   ]);
 
-  // 3. Guardar de inmediato en IndexedDB
+  // 3. Emitir señal a RTDB (0 lecturas en Firestore para los demás)
+  await broadcastRtdbSignal({
+    [`activities/${docRef.id}`]: timestamp
+  });
+
+  // 4. Guardar de inmediato en IndexedDB local
   await putInStore(STORES.ACTIVITIES, createdActivity);
 
   return createdActivity;
 };
 
 /**
- * Actualiza una actividad existente y su marca de tiempo en el meta
+ * Actualiza una actividad existente y su marca de tiempo en el meta y RTDB
  */
 export const updateActivityWithSync = async (id, activityData) => {
   const timestamp = new Date().toISOString();
@@ -301,7 +371,12 @@ export const updateActivityWithSync = async (id, activityData) => {
     setDoc(META_SYNC_REF, metaUpdate, { merge: true })
   ]);
 
-  // 3. Actualizar en IndexedDB
+  // 3. Emitir señal a RTDB
+  await broadcastRtdbSignal({
+    [`activities/${id}`]: timestamp
+  });
+
+  // 4. Actualizar en IndexedDB
   const fullUpdated = { id, ...dataToUpdate };
   await putInStore(STORES.ACTIVITIES, fullUpdated);
 
@@ -309,7 +384,7 @@ export const updateActivityWithSync = async (id, activityData) => {
 };
 
 /**
- * Actualiza el estado de la actividad y sincroniza meta
+ * Actualiza el estado de la actividad y sincroniza meta y RTDB
  */
 export const updateActivityStatusWithSync = async (id, newStatus) => {
   const timestamp = new Date().toISOString();
@@ -329,6 +404,11 @@ export const updateActivityStatusWithSync = async (id, newStatus) => {
     setDoc(META_SYNC_REF, metaUpdate, { merge: true })
   ]);
 
+  // Emitir señal a RTDB
+  await broadcastRtdbSignal({
+    [`activities/${id}`]: timestamp
+  });
+
   // Actualizar en IndexedDB local
   const current = await getFromStore(STORES.ACTIVITIES, id);
   if (current) {
@@ -337,7 +417,7 @@ export const updateActivityStatusWithSync = async (id, newStatus) => {
 };
 
 /**
- * Elimina una actividad de Firestore, Storage, Meta e IndexedDB
+ * Elimina una actividad de Firestore, Storage, Meta, RTDB e IndexedDB
  */
 export const deleteActivityWithSync = async (activity) => {
   if (!activity || !activity.id) return;
@@ -364,7 +444,12 @@ export const deleteActivityWithSync = async (activity) => {
     updateDoc(META_SYNC_REF, metaDelete).catch(() => {})
   ]);
 
-  // 4. Borrar de IndexedDB
+  // 4. Actualizar RTDB
+  await broadcastRtdbSignal({
+    [`activities/${activity.id}`]: null
+  });
+
+  // 5. Borrar de IndexedDB
   await deleteFromStore(STORES.ACTIVITIES, activity.id);
 };
 
@@ -391,7 +476,12 @@ export const saveAcademicStructureWithSync = async (tetras) => {
     setDoc(META_SYNC_REF, metaUpdate, { merge: true })
   ]);
 
-  // 3. Guardar en IndexedDB
+  // 3. Emitir señal a RTDB
+  await broadcastRtdbSignal({
+    structure_updatedAt: timestamp
+  });
+
+  // 4. Guardar en IndexedDB
   await putInStore(STORES.ACADEMIC_STRUCTURE, {
     id: LOCAL_STRUCTURE_ID,
     tetras,
