@@ -57,11 +57,19 @@ import ConfigModal from './components/ConfigModal';
 import KanbanView from './components/KanbanView';
 import ListView from './components/ListView';
 import CalendarView from './components/CalendarView';
-import FirebaseStatusBanner from './components/FirebaseStatusBanner';
-import InAppNotificationBanner from './components/InAppNotificationBanner';
 import NotificationActivationReminder from './components/NotificationActivationReminder';
 import OnboardingScreen from './components/OnboardingScreen';
 import NotificationDrawer from './components/NotificationDrawer';
+import AppTutorial from './components/AppTutorial';
+
+const isTutorialRequested = () => {
+  if (typeof window === 'undefined') return false;
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.has('tuto') || searchParams.has('tutorial')) return true;
+  const hash = window.location.hash || '';
+  if (hash.includes('tuto') || hash.includes('tutorial')) return true;
+  return false;
+};
 
 export function App() {
   const { currentUser, isEditor, isAdmin, isStudent, loading: authLoading } = useAuth();
@@ -97,6 +105,35 @@ export function App() {
   const [configModalTab, setConfigModalTab] = useState(initialNav.configTab || 'tetras');
   const [resourcesModalOpen, setResourcesModalOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(initialNav.modal === 'notifications');
+  const [showTutorial, setShowTutorial] = useState(() => isTutorialRequested());
+
+  // Escuchar cambios en la URL (por ejemplo si el usuario escribe ?tuto o navega atrás/adelante)
+  useEffect(() => {
+    const checkTutoUrl = () => {
+      setShowTutorial(isTutorialRequested());
+    };
+    window.addEventListener('popstate', checkTutoUrl);
+    window.addEventListener('hashchange', checkTutoUrl);
+    return () => {
+      window.removeEventListener('popstate', checkTutoUrl);
+      window.removeEventListener('hashchange', checkTutoUrl);
+    };
+  }, []);
+
+  const handleCloseTutorial = () => {
+    setShowTutorial(false);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('tuto');
+      url.searchParams.delete('tutorial');
+      let newHash = url.hash;
+      if (newHash.includes('tuto') || newHash.includes('tutorial')) {
+        newHash = '#/kanban';
+      }
+      const searchPart = url.searchParams.toString() ? `?${url.searchParams.toString()}` : '';
+      window.history.replaceState({}, document.title, url.pathname + searchPart + newHash);
+    }
+  };
 
   const handleSelectActivityFromNotification = (activityId) => {
     const found = activities.find(a => a.id === activityId);
@@ -666,6 +703,11 @@ export function App() {
       selectedStatus: 'pending'
     }, false);
   };
+
+  // --- ACCESO AL TUTORIAL SIN LOGIN (?tuto) ---
+  if (showTutorial) {
+    return <AppTutorial onClose={handleCloseTutorial} currentUser={currentUser} />;
+  }
 
   // --- CANCELACIÓN TOTAL DE USO ANÓNIMO ---
   // Si Firebase Auth está cargando

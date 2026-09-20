@@ -81,6 +81,10 @@ export const hashToNavState = (hash = '') => {
 
   const state = { ...DEFAULT_NAV_STATE };
 
+  if (pathSegments[0] === 'tuto' || pathSegments[0] === 'tutorial') {
+    state.modal = 'tutorial';
+    return state;
+  }
   if (pathSegments[0] === 'config') {
     state.modal = 'config';
     state.configTab = pathSegments[1] || 'tetras';
