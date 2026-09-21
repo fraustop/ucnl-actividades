@@ -231,17 +231,19 @@ export function App() {
     return () => unsubscribe();
   }, [currentUser]);
 
-  // 5. Escuchar difusiones remotas desde el backend (broadcast_notifications en Firestore)
+  // 5. Escuchar difusiones remotas (broadcast_notifications en Firestore)
   useEffect(() => {
     if (!currentUser) return;
 
     // Registrar el momento exacto en que se inicia el listener.
-    // Solo se procesarán documentos cuyo createdAt sea POSTERIOR a este momento.
-    // Esto evita mostrar notificaciones antiguas al (re)abrir la app.
+    // Solo se procesarán documentos cuyo createdAt sea estrictamente POSTERIOR a este momento.
     const listenerStartTime = new Date().toISOString();
-    console.log('[BroadcastListener] Iniciado. Solo se mostrarán notificaciones creadas después de:', listenerStartTime);
 
-    const q = query(collection(db, 'broadcast_notifications'), orderBy('createdAt', 'desc'));
+    const q = query(
+      collection(db, 'broadcast_notifications'),
+      where('createdAt', '>', listenerStartTime),
+      orderBy('createdAt', 'desc')
+    );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
@@ -249,13 +251,12 @@ export function App() {
           const data = change.doc.data();
           const docCreatedAt = data.createdAt || '';
 
-          // Ignorar documentos que existían antes de que iniciara el listener
+          // Filtro de seguridad adicional para descartar cualquier histórico
           if (docCreatedAt <= listenerStartTime) {
-            console.log('[BroadcastListener] Ignorando doc antiguo:', docCreatedAt);
             return;
           }
 
-          console.log('[BroadcastListener] ✅ Nueva notificación remota recibida:', data.title);
+          console.log('[BroadcastListener] ✅ Nueva difusión en tiempo real recibida:', data.title);
           emitLocalNotification(data.title || '🔔 UCNL Actividades', {
             body: data.body || '',
             tag: `broadcast_${change.doc.id}`,

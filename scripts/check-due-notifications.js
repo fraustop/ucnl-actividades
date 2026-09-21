@@ -8,6 +8,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Flags de ejecución por línea de comandos o GitHub Actions
+const isForce = process.argv.includes('--force') || process.env.INPUT_FORCE === 'true' || process.env.FORCE_RUN === 'true';
+const isDryRun = process.argv.includes('--dry-run');
+
 // ─── 1. Inicialización de Firebase Admin SDK ──────────────────────────────────
 let serviceAccount = null;
 
@@ -56,6 +60,42 @@ const messaging = getMessaging();
 // ─── 2. Funciones Auxiliares ──────────────────────────────────────────────────
 
 /**
+ * Obtiene la fecha y hora actual en la zona horaria de Monterrey / Centro de México
+ */
+function getMonterreyDateTime() {
+  const now = new Date();
+  
+  // Formato YYYY-MM-DD
+  const dateParts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Monterrey',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(now);
+
+  // Formato HH:MM (24 horas)
+  const timeFormatter = new Intl.DateTimeFormat('es-MX', {
+    timeZone: 'America/Monterrey',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  
+  const timeParts = timeFormatter.format(now);
+  const [hourStr, minuteStr] = timeParts.split(':');
+  const currentHour = parseInt(hourStr, 10);
+  const currentMinute = parseInt(minuteStr, 10);
+
+  return {
+    todayStr: dateParts, // e.g. "2026-09-21"
+    timeStr: timeParts,  // e.g. "08:00"
+    currentHour,
+    currentMinute,
+    iso: now.toISOString()
+  };
+}
+
+/**
  * Obtiene la configuración de notificaciones guardada en Firestore
  */
 async function getNotificationConfig() {
@@ -66,19 +106,29 @@ async function getNotificationConfig() {
     notify4Days: true,
     notify3DaysDaily: true,
     notifyNewActivity: true,
-    notifyNewUserToAdmins: true
+    notifyNewUserToAdmins: true,
+    lastDailyReminderDate: null
   };
 
   try {
     const docSnap = await db.collection('config').doc('notifications').get();
     if (docSnap.exists) {
-      console.log('⚙️ Configuración de notificaciones cargada desde Firestore.');
-      return { ...defaults, ...docSnap.data() };
+      const data = docSnap.data();
+      console.log('⚙️ Configuración cargada desde Firestore (config/notifications).');
+      return { ...defaults, ...data };
+    } else {
+      console.log('ℹ️ No existía config/notifications en Firestore, inicializando con valores por defecto.');
+      await db.collection('config').doc('notifications').set({
+        ...defaults,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      return defaults;
     }
   } catch (err) {
     console.warn('⚠️ No se pudo cargar config/notifications, usando valores por defecto:', err.message);
+    return defaults;
   }
-  return defaults;
 }
 
 /**
@@ -96,13 +146,13 @@ async function getAllUsersWithTokens() {
 
       // Tokens del arreglo principal
       if (Array.isArray(data.fcmTokens)) {
-        data.fcmTokens.forEach(t => t && typeof t === 'string' && tokens.add(t.trim()));
+        data.fcmTokens.forEach(t => t && typeof t === 'string' && t.trim().length > 15 && tokens.add(t.trim()));
       }
       // Token único legado o lastFcmToken
-      if (data.lastFcmToken && typeof data.lastFcmToken === 'string') {
+      if (data.lastFcmToken && typeof data.lastFcmToken === 'string' && data.lastFcmToken.trim().length > 15) {
         tokens.add(data.lastFcmToken.trim());
       }
-      if (data.fcmToken && typeof data.fcmToken === 'string') {
+      if (data.fcmToken && typeof data.fcmToken === 'string' && data.fcmToken.trim().length > 15) {
         tokens.add(data.fcmToken.trim());
       }
 
@@ -111,7 +161,7 @@ async function getAllUsersWithTokens() {
         const subTokensSnap = await db.collection('users').doc(userId).collection('tokens').get();
         subTokensSnap.forEach(tDoc => {
           const tData = tDoc.data();
-          if (tData.token && typeof tData.token === 'string') {
+          if (tData.token && typeof tData.token === 'string' && tData.token.trim().length > 15) {
             tokens.add(tData.token.trim());
           } else if (tDoc.id && tDoc.id.length > 20) {
             tokens.add(tDoc.id.trim());
@@ -145,6 +195,12 @@ async function sendFcmPush(tokens, title, body, dataPayload = {}) {
 
   const tokenList = Array.from(new Set(tokens.filter(Boolean)));
   const results = { sent: 0, failed: 0, invalidTokens: [] };
+
+  if (isDryRun) {
+    console.log(`   [DRY-RUN] Simulado envío de push a ${tokenList.length} token(s): "${title}"`);
+    return { sent: tokenList.length, failed: 0, invalidTokens: [] };
+  }
+
   const BATCH_SIZE = 500;
 
   for (let i = 0; i < tokenList.length; i += BATCH_SIZE) {
@@ -155,9 +211,19 @@ async function sendFcmPush(tokens, title, body, dataPayload = {}) {
         title,
         body
       },
+      android: {
+        collapseKey: 'ucnl_daily_due',
+        priority: 'high',
+        notification: {
+          tag: 'ucnl_daily_reminder',
+          icon: 'icon_notification',
+          color: '#2563eb'
+        }
+      },
       webpush: {
         headers: {
-          Urgency: 'high'
+          Urgency: 'high',
+          Topic: 'ucnl_daily_due'
         },
         notification: {
           title,
@@ -165,7 +231,9 @@ async function sendFcmPush(tokens, title, body, dataPayload = {}) {
           icon: '/icons/icon-192.png',
           badge: '/icons/icon-192.png',
           vibrate: [200, 100, 200],
-          requireInteraction: false
+          requireInteraction: false,
+          tag: 'ucnl_daily_reminder',
+          renotify: false
         },
         fcmOptions: {
           link: '/'
@@ -236,46 +304,60 @@ async function cleanInvalidTokens(invalidTokens, users) {
   }
 }
 
-/**
- * Registrar mensaje en broadcast_notifications para la interfaz web en tiempo real
- */
-async function recordBroadcast(title, body, extra = {}) {
-  try {
-    await db.collection('broadcast_notifications').add({
-      title,
-      body,
-      ...extra,
-      source: 'github-actions-worker',
-      createdAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.warn('⚠️ No se pudo registrar broadcast en Firestore:', err.message);
-  }
-}
-
-// ─── 3. Flujo Principal de Evaluación ─────────────────────────────────────────
+// ─── 3. Flujo Principal del Worker Automatizado ──────────────────────────────
 async function runNotificationWorker() {
   const startTime = Date.now();
+  const mty = getMonterreyDateTime();
+
   console.log('====================================================');
   console.log('🚀 UCNL Actividades — Automated Notification Worker');
-  console.log(`📅 Fecha/Hora: ${new Date().toISOString()} (${new Date().toLocaleString('es-MX', { timeZone: 'America/Monterrey' })} Monterrey)`);
+  console.log(`📅 Fecha/Hora Actual: ${mty.todayStr} ${mty.timeStr} (Zona Horaria Monterrey UTC-6)`);
+  if (isForce) console.log('⚡ Modo FORZADO activado (--force). Se omitirán comprobaciones de hora y fecha.');
+  if (isDryRun) console.log('🧪 Modo DRY-RUN activado. No se enviarán mensajes reales.');
   console.log('====================================================');
 
-  // 1. Obtener configuración
+  // 1. Obtener configuración activa de Firestore
   const config = await getNotificationConfig();
-  console.log('Configuración activa:', JSON.stringify(config, null, 2));
+  const configuredHourStr = config.notificationHour || '08:00';
+  const configuredHour = parseInt(configuredHourStr.split(':')[0] || '8', 10);
 
-  // 2. Obtener usuarios y tokens
+  console.log(`⚙️ Configuración activa:`);
+  console.log(`   • Recordatorio diario activo: ${config.daily7DaysReminderEnabled !== false}`);
+  console.log(`   • Hora programada:            ${configuredHourStr} (Hora ${configuredHour}:00)`);
+  console.log(`   • Última fecha enviada:       ${config.lastDailyReminderDate || 'Ninguna'}`);
+
+  // 2. Comprobar si el recordatorio diario está habilitado
+  if (config.daily7DaysReminderEnabled === false && !isForce) {
+    console.log('\n⏹️ El recordatorio diario está DESACTIVADO en la configuración. Finalizando.');
+    return;
+  }
+
+  // 3. Comprobar si coincide la hora programada
+  const hourMatches = mty.currentHour === configuredHour;
+  if (!hourMatches && !isForce) {
+    console.log(`\n⏳ Hora actual (${mty.timeStr}) no coincide con la hora programada (${configuredHourStr}).`);
+    console.log(`   El worker continuará esperando a las ${configuredHourStr} en las siguientes ejecuciones horarias.`);
+    return;
+  }
+
+  // 4. Comprobar si ya se envió hoy para garantizar estrictamente 1 sola notificación al día
+  if (config.lastDailyReminderDate === mty.todayStr && !isForce) {
+    console.log(`\n✅ El recordatorio diario ya fue enviado el día de hoy (${mty.todayStr}).`);
+    console.log(`   Omitiendo para evitar duplicidad. Se enviará nuevamente mañana a las ${configuredHourStr}.`);
+    return;
+  }
+
+  console.log('\n🎯 Condiciones cumplidas: Iniciando evaluación de actividades escolares...');
+
+  // 5. Obtener usuarios y tokens
   const users = await getAllUsersWithTokens();
   const totalTokens = users.reduce((acc, u) => acc + u.tokens.length, 0);
-  console.log(`👥 Usuarios registrados: ${users.length} (${totalTokens} tokens FCM activos en total)`);
+  console.log(`👥 Usuarios registrados: ${users.length} (${totalTokens} dispositivos/tokens FCM activos)`);
 
-  // 3. Obtener actividades pendientes
+  // 6. Obtener actividades de Firestore
   const activitiesSnap = await db.collection('activities').get();
   const now = new Date();
-  const pendingActivities = [];
   const dueIn7Days = [];
-  const milestoneAlerts = [];
 
   activitiesSnap.forEach(docSnap => {
     const act = { id: docSnap.id, ...docSnap.data() };
@@ -285,59 +367,30 @@ async function runNotificationWorker() {
     const diffTime = dueDate.getTime() - now.getTime();
     const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    pendingActivities.push({ ...act, daysLeft });
-
-    // Actividades que vencen hoy o en los siguientes 7 días
+    // Actividades que vencen en los próximos 7 días (días restantes >= 0 y <= 7)
     if (daysLeft >= 0 && daysLeft <= 7) {
       dueIn7Days.push({ ...act, daysLeft });
     }
-
-    // Reglas de alerta por hito de urgencia
-    if (daysLeft === 7 && config.notify7Days !== false) {
-      milestoneAlerts.push({
-        type: '7_days',
-        title: `🟢 Recordatorio (7 días restantes): ${act.subject || 'Materia'}`,
-        body: `La actividad "${act.title}" vence en 7 días (${act.dueDate.replace('T', ' ')}).`,
-        activityId: act.id,
-        daysLeft
-      });
-    } else if (daysLeft === 4 && config.notify4Days !== false) {
-      milestoneAlerts.push({
-        type: '4_days',
-        title: `🟡 Recordatorio (4 días restantes): ${act.subject || 'Materia'}`,
-        body: `Quedan 4 días para entregar "${act.title}" (${act.dueDate.replace('T', ' ')}).`,
-        activityId: act.id,
-        daysLeft
-      });
-    } else if (daysLeft <= 3 && daysLeft >= 0 && config.notify3DaysDaily !== false) {
-      const urg = daysLeft === 0 ? '¡VENCE HOY!' : daysLeft === 1 ? '¡Vence mañana!' : `${daysLeft} días restantes`;
-      milestoneAlerts.push({
-        type: 'urgent',
-        title: `🔴 Entrega Urgente (${urg}): ${act.subject || 'Materia'}`,
-        body: `"${act.title}" debe entregarse pronto (${act.dueDate.replace('T', ' ')}).`,
-        activityId: act.id,
-        daysLeft
-      });
-    }
   });
 
-  console.log(`📚 Total actividades en la base de datos: ${activitiesSnap.size}`);
-  console.log(`📌 Actividades pendientes en los próximos 7 días: ${dueIn7Days.length}`);
-  console.log(`🚨 Alertas de hitos específicas hoy: ${milestoneAlerts.length}`);
+  console.log(`📚 Total actividades en base de datos: ${activitiesSnap.size}`);
+  console.log(`📌 Actividades próximas a vencer en los siguientes 7 días: ${dueIn7Days.length}`);
 
   let totalSent = 0;
   let totalFailed = 0;
+  let studentsNotified = 0;
   const invalidTokensCollected = [];
 
-  // 4. Enviar Recordatorio Diario Personalizado (si está habilitado)
-  if (config.daily7DaysReminderEnabled !== false && dueIn7Days.length > 0) {
-    console.log('\n--- Evaluando recordatorios personalizados por alumno ---');
-    let studentsNotified = 0;
+  if (dueIn7Days.length === 0) {
+    console.log('✅ No hay actividades pendientes en los próximos 7 días. No se requieren recordatorios hoy.');
+  } else {
+    // 7. Enviar 1 notificación diaria personalizada por cada estudiante
+    console.log('\n--- Enviando notificación diaria personalizada por estudiante ---');
 
     for (const user of users) {
       if (user.tokens.length === 0) continue;
 
-      // Obtener completadas por el alumno
+      // Obtener tareas marcadas como completadas por este estudiante
       let completedIds = new Set();
       try {
         const compSnap = await db.collection('users').doc(user.id).collection('completions').get();
@@ -351,7 +404,7 @@ async function runNotificationWorker() {
         console.warn(`No se pudieron consultar completions de ${user.id}:`, e.message);
       }
 
-      // Filtrar pendientes para este usuario
+      // Filtrar actividades que este estudiante aún NO ha completado
       const userPending = dueIn7Days.filter(a => !completedIds.has(a.id));
       const pendingCount = userPending.length;
 
@@ -380,60 +433,43 @@ async function runNotificationWorker() {
         totalFailed += pushRes.failed;
         invalidTokensCollected.push(...pushRes.invalidTokens);
         studentsNotified++;
-        console.log(`   ✉️ Notificado ${user.name} (${user.email}): ${pendingCount} pendientes -> ${pushRes.sent} enviado(s)`);
+        console.log(`   ✉️ Notificado ${user.name} (${user.email}): ${pendingCount} pendientes -> ${pushRes.sent} push(es)`);
       }
     }
-
-    console.log(`✅ Recordatorio diario personalizado completado: ${studentsNotified} alumnos notificados.`);
-
-    // Registrar en broadcast para el feed web
-    await recordBroadcast(
-      `📚 Recordatorio Diario: ${dueIn7Days.length} actividades próximas a cerrar`,
-      `Hay actividades escolares programadas para entrega en los próximos 7 días. ¡Revisa tu estado en el tablero!`,
-      { type: 'daily_7days_reminder', count: dueIn7Days.length }
-    );
   }
 
-  // 5. Enviar Alertas de Hitos Específicos solo si el recordatorio diario consolidado no está habilitado
-  if (config.daily7DaysReminderEnabled === false && milestoneAlerts.length > 0) {
-    console.log('\n--- Enviando alertas de hitos de vencimiento (modo individual) ---');
-    const allTokens = users.flatMap(u => u.tokens);
-
-    for (const alert of milestoneAlerts) {
-      console.log(`   🚨 Enviando alerta: "${alert.title}"`);
-      const pushRes = await sendFcmPush(allTokens, alert.title, alert.body, {
-        type: alert.type,
-        activityId: alert.activityId,
-        daysLeft: String(alert.daysLeft)
-      });
-
-      totalSent += pushRes.sent;
-      totalFailed += pushRes.failed;
-      invalidTokensCollected.push(...pushRes.invalidTokens);
-
-      await recordBroadcast(alert.title, alert.body, {
-        type: 'due_alert',
-        activityId: alert.activityId,
-        daysLeft: alert.daysLeft
-      });
-    }
-  }
-
-  // 6. Limpieza de tokens si hubo fallos
+  // 8. Limpiar tokens inválidos encontrados
   if (invalidTokensCollected.length > 0) {
     await cleanInvalidTokens(invalidTokensCollected, users);
   }
 
+  // 9. Registrar fecha de ejecución exitosa en Firestore para no repetir hoy
+  if (!isDryRun) {
+    try {
+      await db.collection('config').doc('notifications').set({
+        lastDailyReminderDate: mty.todayStr,
+        lastDailyReminderTimestamp: new Date().toISOString(),
+        lastExecutionStudentsCount: studentsNotified,
+        lastExecutionPushesSent: totalSent,
+        lastExecutionStatus: 'success'
+      }, { merge: true });
+      console.log(`\n💾 Registro diario guardado en Firestore: lastDailyReminderDate = "${mty.todayStr}"`);
+    } catch (err) {
+      console.warn('⚠️ No se pudo actualizar lastDailyReminderDate en Firestore:', err.message);
+    }
+  }
+
   const durationSec = ((Date.now() - startTime) / 1000).toFixed(2);
   console.log('\n====================================================');
-  console.log(`🎉 Resumen de Ejecución (${durationSec}s):`);
-  console.log(`   • Pushes enviados con éxito: ${totalSent}`);
-  console.log(`   • Pushes fallidos:           ${totalFailed}`);
-  console.log(`   • Tokens depurados:          ${invalidTokensCollected.length}`);
+  console.log(`🎉 Resumen de Ejecución Finalizada (${durationSec}s):`);
+  console.log(`   • Estudiantes con pendientes: ${studentsNotified}`);
+  console.log(`   • Notificaciones push enviadas: ${totalSent}`);
+  console.log(`   • Envíos fallidos:             ${totalFailed}`);
+  console.log(`   • Tokens inválidos limpiados:  ${invalidTokensCollected.length}`);
   console.log('====================================================\n');
 }
 
-// Ejecutar
+// Ejecutar worker
 runNotificationWorker()
   .then(() => process.exit(0))
   .catch(err => {

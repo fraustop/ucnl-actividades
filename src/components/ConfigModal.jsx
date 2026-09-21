@@ -1369,11 +1369,14 @@ export const ConfigModal = ({
                     <BellRing className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                      <span>Configuración de Notificaciones y Horarios</span>
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm text-white">Configuración de Notificaciones y Horarios</h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                        GitHub Actions
+                      </span>
+                    </div>
                     <p className="text-xs text-blue-200/80">
-                      Gestiona las reglas de recordatorio automático según la urgencia y el horario de envío.
+                      Servidor automatizado en GitHub: envía exactamente 1 notificación diaria consolidada a la hora programada.
                     </p>
                   </div>
                 </div>

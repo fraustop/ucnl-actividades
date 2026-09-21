@@ -20,7 +20,9 @@ messaging.onBackgroundMessage((payload) => {
     icon: payload.notification?.icon || '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     vibrate: [200, 100, 200],
-    requireInteraction: true,
+    requireInteraction: false,
+    tag: payload.data?.tag || 'ucnl_daily_reminder',
+    renotify: false,
     data: payload.data || { url: '/?action=confirm_notification' },
     actions: [
       {

@@ -2,9 +2,15 @@ name: UCNL Automated Notifications Worker
 
 on:
   schedule:
-    # 14:00 UTC = 08:00 AM Hora Monterrey / Centro de México (UTC-6)
-    - cron: '0 14 * * *'
+    # Se ejecuta cada hora al minuto 0 para verificar la hora configurada en Firestore (por defecto 08:00 AM Monterrey)
+    - cron: '0 * * * *'
   workflow_dispatch: # Permite ejecución manual bajo demanda desde GitHub o CLI
+    inputs:
+      force:
+        description: 'Forzar envío omitiendo comprobación de hora y fecha'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   check-and-notify:

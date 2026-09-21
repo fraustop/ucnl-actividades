@@ -1,5 +1,5 @@
 import { getToken, onMessage } from 'firebase/messaging';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection } from 'firebase/firestore';
 import { getFirebaseMessaging, db } from './firebase';
 import { saveUserFcmToken, removeUserFcmToken } from './userService';
 import { saveNotificationToIndexedDb } from './indexedDbService';
@@ -10,22 +10,7 @@ const VAPID_KEY = 'BJrIxSyWjOPVSrzLTmBemuxeYA5YA5RlNTGLWCTfkBcbk3bmhJENqUn5B109y
 const LOCAL_STORAGE_FCM_KEY = 'ucnl_fcm_token';
 const LOCAL_STORAGE_NOTIFICATION_CONFIG_KEY = 'ucnl_notification_schedule_config';
 const LOCAL_STORAGE_DUE_CHECK_KEY = 'ucnl_last_local_due_check';
-const LOCAL_STORAGE_BACKEND_URL_KEY = 'ucnl_notification_backend_url';
 const NOTIFICATION_CONFIG_DOC_REF = doc(db, 'config', 'notifications');
-
-export const DEFAULT_BACKEND_URL = 'http://148.230.165.236:3001';
-
-export const getBackendUrl = () => {
-  return localStorage.getItem(LOCAL_STORAGE_BACKEND_URL_KEY) || DEFAULT_BACKEND_URL;
-};
-
-export const setBackendUrl = (url) => {
-  if (!url) {
-    localStorage.removeItem(LOCAL_STORAGE_BACKEND_URL_KEY);
-  } else {
-    localStorage.setItem(LOCAL_STORAGE_BACKEND_URL_KEY, url.trim().replace(/\/$/, ''));
-  }
-};
 
 export const DEFAULT_NOTIFICATION_CONFIG = {
   daily7DaysReminderEnabled: true,
@@ -35,7 +20,6 @@ export const DEFAULT_NOTIFICATION_CONFIG = {
   notify3DaysDaily: true,
   notifyNewActivity: true,
   notifyNewUserToAdmins: true,
-  backendUrl: DEFAULT_BACKEND_URL,
   updatedAt: null
 };
 
@@ -292,7 +276,7 @@ export const notifyNewActivityLocal = async (activity) => {
 };
 
 /**
- * Notifica vía push a los usuarios cuando un docente o admin crea una nueva actividad o reunión
+ * Notifica a los usuarios conectados cuando un docente o admin crea una nueva actividad o reunión
  */
 export const notifyNewActivityPush = async (activity) => {
   if (!activity) return;
@@ -304,20 +288,18 @@ export const notifyNewActivityPush = async (activity) => {
   const body = `${activity.title}${activity.tetraName ? ` (${activity.tetraName})` : ''} - Fecha: ${activity.dueDate ? activity.dueDate.replace('T', ' ') : 'Por definir'}`;
 
   try {
-    const backendUrl = getBackendUrl();
-    await fetch(`${backendUrl}/api/notify/broadcast`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        body,
-        role: 'all',
-        url: '/'
-      }),
-      signal: AbortSignal.timeout(6000)
-    }).catch(() => {});
+    const broadcastRef = doc(collection(db, 'broadcast_notifications'));
+    await setDoc(broadcastRef, {
+      id: broadcastRef.id,
+      title,
+      body,
+      type: 'new_activity',
+      activityId: activity.id || '',
+      url: '/',
+      createdAt: new Date().toISOString()
+    });
   } catch (e) {
-    console.debug('Aviso push backend nueva actividad:', e);
+    console.debug('Aviso difusión nueva actividad:', e);
   }
 };
 
@@ -473,117 +455,12 @@ export const onForegroundMessage = async (callback) => {
 };
 
 /**
- * Consulta el estado de salud del servidor backend en su IP Externa o URL configurada
- */
-export const fetchBackendStatus = async (customUrl = null) => {
-  const baseUrl = customUrl || getBackendUrl();
-  try {
-    const res = await fetch(`${baseUrl}/api/status`, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(5000)
-    });
-    if (!res.ok) {
-      throw new Error(`Error HTTP ${res.status} desde el backend.`);
-    }
-    const data = await res.json();
-    return { ok: true, data };
-  } catch (err) {
-    return { ok: false, error: err.message || 'No se pudo conectar al servidor backend.' };
-  }
-};
-
-/**
- * Dispara manualmente la evaluación de vencimientos en el servidor backend
- */
-export const triggerBackendDueEvaluation = async (customUrl = null) => {
-  const baseUrl = customUrl || getBackendUrl();
-  try {
-    const res = await fetch(`${baseUrl}/api/notify/due`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!res.ok) {
-      throw new Error(`Error HTTP ${res.status}`);
-    }
-    return await res.json();
-  } catch (err) {
-    throw new Error(`Fallo al solicitar evaluación al backend: ${err.message}`);
-  }
-};
-
-/**
- * Dispara una notificación de prueba desde el servidor backend
- */
-export const triggerBackendTestNotification = async (customUrl = null, title = '', body = '') => {
-  const baseUrl = customUrl || getBackendUrl();
-  try {
-    const res = await fetch(`${baseUrl}/api/notify/test`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body }),
-      signal: AbortSignal.timeout(8000)
-    });
-    if (!res.ok) {
-      throw new Error(`Error HTTP ${res.status}`);
-    }
-    return await res.json();
-  } catch (err) {
-    throw new Error(`Fallo al enviar prueba desde el backend: ${err.message}`);
-  }
-};
-
-/**
- * Dispara manualmente el recordatorio diario de actividades de los próximos 7 días desde el backend
- */
-export const triggerDaily7DaysReminder = async (customUrl = null) => {
-  const baseUrl = customUrl || getBackendUrl();
-  try {
-    const res = await fetch(`${baseUrl}/api/notify/daily-7days`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!res.ok) {
-      throw new Error(`Error HTTP ${res.status}`);
-    }
-    return await res.json();
-  } catch (err) {
-    throw new Error(`Fallo al solicitar recordatorio de 7 días: ${err.message}`);
-  }
-};
-
-/**
- * Notifica a los administradores sobre un nuevo usuario registrado
+ * Notifica a los administradores sobre un nuevo usuario registrado (gestionado mediante Firestore)
  */
 export const notifyAdminsNewUser = async (userProfile) => {
+  // Las notificaciones de nuevo usuario se escriben en la colección 'admin_notifications' de Firestore
+  // y se distribuyen en tiempo real a los administradores conectados.
   if (!userProfile) return;
-  const roleName = userProfile.role === 'admin' ? 'Administrador' : userProfile.role === 'docente' ? 'Docente' : 'Estudiante';
-  const title = `👤 Nuevo Usuario: ${userProfile.displayName || 'Estudiante'}`;
-  const body = `${userProfile.displayName || 'Un nuevo usuario'} (${userProfile.email}) se ha registrado en la plataforma como ${roleName}.`;
-
-  // Enviar notificación push mediante el backend para dispositivos admin
-  try {
-    const backendUrl = getBackendUrl();
-    await fetch(`${backendUrl}/api/notify/new-user`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        body,
-        user: {
-          uid: userProfile.uid,
-          email: userProfile.email,
-          displayName: userProfile.displayName,
-          role: userProfile.role
-        }
-      }),
-      signal: AbortSignal.timeout(6000)
-    }).catch(() => {});
-  } catch (e) {
-    console.warn('Error al notificar backend sobre nuevo usuario:', e);
-  }
 };
 
 

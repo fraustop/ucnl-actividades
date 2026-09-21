@@ -168,6 +168,8 @@ self.addEventListener('push', (event) => {
     icon: notificationData.icon,
     badge: notificationData.badge,
     vibrate: [100, 50, 100],
+    tag: notificationData.data?.tag || 'ucnl_daily_reminder',
+    renotify: false,
     data: notificationData.data
   };
 
