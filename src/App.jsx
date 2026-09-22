@@ -35,7 +35,7 @@ import {
   notifyNewActivityLocal,
   emitLocalNotification
 } from './services/notificationService';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { compareActivitiesByDueDate } from './utils/dateUtils';
 import { 
