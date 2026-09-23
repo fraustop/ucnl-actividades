@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ucnl-actividades-v6';
+const CACHE_NAME = 'ucnl-actividades-v7';
 
 const STATIC_ASSETS = [
   '/',

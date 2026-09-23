@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, 
   Calendar, 
@@ -32,7 +32,6 @@ import {
 import confetti from 'canvas-confetti';
 import { 
   onForegroundMessage,
-  notifyNewActivityLocal,
   emitLocalNotification
 } from './services/notificationService';
 import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
@@ -166,6 +165,11 @@ export function App() {
     return true;
   });
 
+  // Control estricto de sesión para notificaciones en tiempo real (evita disparo de eventos pasados al abrir la app)
+  const sessionStartTimeRef = useRef(new Date().toISOString());
+  const seenBroadcastNotifIdsRef = useRef(new Set());
+  const seenAdminNotifIdsRef = useRef(new Set());
+
   // 1. Inicializar sincronización delta inteligente SOLO para usuarios autenticados
   useEffect(() => {
     if (!currentUser) return;
@@ -174,20 +178,11 @@ export function App() {
     setFirebaseError(null);
 
     const unsubscribe = initSync(
-      ({ activities: syncedActivities, academicStructure: syncedStructure, isFromCache, deltaStats, newlyAddedActivities }) => {
+      ({ activities: syncedActivities, academicStructure: syncedStructure, isFromCache, deltaStats }) => {
         setActivities(syncedActivities || []);
         setAcademicStructure(syncedStructure || []);
         setSyncStatus({ isCached: isFromCache, stats: deltaStats });
         setLoading(false);
-
-        // Notificar en tiempo real si otro usuario publica una nueva actividad con la app abierta
-        if (newlyAddedActivities && newlyAddedActivities.length > 0) {
-          newlyAddedActivities.forEach((act) => {
-            if (act.createdById !== currentUser.uid) {
-              notifyNewActivityLocal(act);
-            }
-          });
-        }
       },
       (err) => {
         console.error('Error en sincronización:', err);
@@ -235,31 +230,48 @@ export function App() {
   useEffect(() => {
     if (!currentUser) return;
 
-    // Registrar el momento exacto en que se inicia el listener.
-    // Solo se procesarán documentos cuyo createdAt sea estrictamente POSTERIOR a este momento.
-    const listenerStartTime = new Date().toISOString();
+    let isInitialSnapshot = true;
 
     const q = query(
       collection(db, 'broadcast_notifications'),
-      where('createdAt', '>', listenerStartTime),
+      where('createdAt', '>', sessionStartTimeRef.current),
       orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (isInitialSnapshot) {
+        isInitialSnapshot = false;
+        snapshot.docs.forEach((d) => seenBroadcastNotifIdsRef.current.add(d.id));
+        return;
+      }
+
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const data = change.doc.data();
+          const docId = change.doc.id;
           const docCreatedAt = data.createdAt || '';
 
-          // Filtro de seguridad adicional para descartar cualquier histórico
-          if (docCreatedAt <= listenerStartTime) {
+          // Filtro de seguridad: descartar cualquier histórico o ya procesado en la sesión
+          if (docCreatedAt <= sessionStartTimeRef.current || seenBroadcastNotifIdsRef.current.has(docId)) {
+            return;
+          }
+
+          seenBroadcastNotifIdsRef.current.add(docId);
+
+          // Ignorar difusiones de vencimientos si existieran en Firestore
+          if (data.type === 'due' || data.type === 'daily_7days_reminder') {
+            return;
+          }
+
+          // No notificar al propio usuario creador
+          if (data.createdById && data.createdById === currentUser.uid) {
             return;
           }
 
           console.log('[BroadcastListener] ✅ Nueva difusión en tiempo real recibida:', data.title);
           emitLocalNotification(data.title || '🔔 UCNL Actividades', {
             body: data.body || '',
-            tag: `broadcast_${change.doc.id}`,
+            tag: `broadcast_${docId}`,
             data: { url: data.url || '/' }
           });
         }
@@ -294,17 +306,36 @@ export function App() {
   useEffect(() => {
     if (!currentUser || !isAdmin) return;
 
-    const listenerStartTime = new Date().toISOString();
     console.log('[AdminNotificationsListener] Iniciado para admin:', currentUser.email);
+    let isInitialSnapshot = true;
 
     const unsubscribe = subscribeToAdminNotifications((notifs) => {
+      if (isInitialSnapshot) {
+        isInitialSnapshot = false;
+        notifs.forEach((n) => seenAdminNotifIdsRef.current.add(n.id));
+        return;
+      }
+
       notifs.forEach((notif) => {
+        const notifId = notif.id;
         const notifCreatedAt = notif.createdAt || '';
-        if (notifCreatedAt > listenerStartTime && !notif.read) {
+
+        if (
+          notifCreatedAt > sessionStartTimeRef.current &&
+          !notif.read &&
+          !seenAdminNotifIdsRef.current.has(notifId)
+        ) {
+          seenAdminNotifIdsRef.current.add(notifId);
+
+          // No notificar al admin si la acción fue sobre sí mismo
+          if (notif.userId && notif.userId === currentUser.uid) {
+            return;
+          }
+
           console.log('[AdminNotificationsListener] ✅ Nueva notificación de administración recibida:', notif.title);
           emitLocalNotification(notif.title || '👤 Nuevo Usuario Registrado', {
             body: notif.message || notif.body || 'Un nuevo usuario se ha registrado en la plataforma.',
-            tag: `admin_notif_${notif.id}`,
+            tag: `admin_notif_${notifId}`,
             data: { url: '/', type: notif.type || 'new_user' }
           });
         }

@@ -291,7 +291,6 @@ export const ActivityWorkspaceModal = ({
     if (!isOpen || workspaceMode !== 'activity' || !currentActivity) {
       return;
     }
-    setUseGoogleDocsFallback(false);
 
     // 1. Intentar cargar el último recurso guardado para esta actividad
     try {
@@ -323,7 +322,6 @@ export const ActivityWorkspaceModal = ({
     if (!isOpen || workspaceMode !== 'subject' || !selectedSubjectId || !subjectData) {
       return;
     }
-    setUseGoogleDocsFallback(false);
 
     // 1. Intentar cargar el último recurso guardado para esta materia
     try {

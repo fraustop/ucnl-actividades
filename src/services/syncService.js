@@ -91,8 +91,6 @@ export const initSync = (onDataUpdated, onError) => {
 
   loadLocalCache();
 
-  let isInitialSnapshot = true;
-
   // Paso 2: Suscripción en tiempo real a la colección de actividades en Firestore
   try {
     const q = query(collection(db, 'activities'), orderBy('dueDate', 'asc'));
@@ -141,23 +139,10 @@ export const initSync = (onDataUpdated, onError) => {
           broadcastRtdbSignal(metaPayload)
         ]).catch(() => {});
 
-        // Detectar actividades recién añadidas para notificaciones (solo después de la carga inicial)
-        let newlyAdded = [];
-        if (!isInitialSnapshot) {
-          snapshot.docChanges().forEach((change) => {
-            if (change.type === 'added') {
-              const data = change.doc.data();
-              newlyAdded.push({ id: change.doc.id, ...data });
-            }
-          });
-        }
-        isInitialSnapshot = false;
-
         onDataUpdated({
           activities: currentActivities,
           academicStructure: currentStructure,
           isFromCache: false,
-          newlyAddedActivities: newlyAdded,
           deltaStats: {
             cached: currentActivities.length
           }

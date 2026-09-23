@@ -340,7 +340,6 @@ async function evaluateDueActivities() {
       const allTokens = await getAllFcmTokens('all');
       for (const alert of alerts) {
         await sendFcmPushToTokens(allTokens, alert.title, alert.body, { activityId: alert.activityId });
-        await writeBroadcast(alert.title, alert.body, { type: 'due', activityId: alert.activityId });
       }
       lastSentCount = alerts.length;
     }
